@@ -5,6 +5,18 @@
 **Status**: Draft  
 **Input**: User description: "$ARGUMENTS"
 
+## Phase 1 Scope & Non-Goals *(mandatory)*
+
+**In Scope**:
+- Public, read-only web app (no login/accounts)
+- Single campus route (outbound + inbound)
+- Map, vehicles, stops, route, ETAs only
+
+**Out of Scope**:
+- Admin/dispatch/driver controls
+- Booking, payments, notifications, personalization
+- Additional routes beyond the single campus loop
+
 ## User Scenarios & Testing *(mandatory)*
 
 <!--
@@ -94,6 +106,57 @@
 
 - **FR-006**: System MUST authenticate users via [NEEDS CLARIFICATION: auth method not specified - email/password, SSO, OAuth?]
 - **FR-007**: System MUST retain user data for [NEEDS CLARIFICATION: retention period not specified]
+
+### Testing Requirements *(mandatory)*
+
+- **TR-001**: Automated tests are REQUIRED for ETA computation, status
+  transitions, and frontend state rendering.
+- **TR-002**: Specify test types and scope (unit, integration, contract, e2e)
+  and exact file paths.
+- **TR-003**: If any automated tests are infeasible, document the risk and
+  manual verification steps.
+
+### Data Reliability Rules *(mandatory)*
+
+- **DR-001**: Vehicle position update cadence is 3 seconds; polling acceptable.
+- **DR-002**: Define freshness thresholds (Fresh <= 15s, Delayed > 15s to 60s,
+  Offline > 60s to 120s, Hidden > 120s).
+- **DR-003**: Define last-updated display requirements and hide behavior.
+
+### UX Trust & Transparency *(mandatory)*
+
+- **UX-001**: Status labels and copy for Fresh/Delayed/Offline/Hidden.
+- **UX-002**: Rules for ETA display when data is stale or missing.
+- **UX-003**: Explicitly state any language that must be avoided to prevent
+  misleading users.
+
+### Performance & Connectivity *(mandatory)*
+
+- **PF-001**: Mobile-first performance expectations and targets.
+- **PF-002**: Behavior under poor connectivity (polling backoff, stale banner,
+  cached data).
+
+### Accessibility & i18n *(mandatory)*
+
+- **AI-001**: Thai is default locale; English optional but complete if offered.
+- **AI-002**: Keyboard navigation, focus visibility, and contrast rules.
+- **AI-003**: Accessible labels for vehicle/status/stop information.
+
+### Security & Privacy *(mandatory)*
+
+- **SP-001**: HTTPS only; no mixed content.
+- **SP-002**: No personal data collection or storage; telemetry is aggregate.
+- **SP-003**: Logging redaction rules for any sensitive fields.
+
+### Data Contracts *(mandatory)*
+
+- **DC-001**: Backend contract fields used for ETA/status/last-updated.
+- **DC-002**: Frontend handling rules for missing or invalid fields.
+- **DC-003**: Contract change compatibility expectations.
+
+### External Interfaces *(include if feature exposes/changes interfaces)*
+
+- **[Interface Name]**: [type, consumers, compatibility notes]
 
 ### Key Entities *(include if feature involves data)*
 

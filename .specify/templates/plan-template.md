@@ -31,7 +31,20 @@
 
 *GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
 
-[Gates determined based on constitution file]
+- [ ] Scope lock confirmed: public, read-only, single campus route, no admin,
+      dispatch, booking, or notifications.
+- [ ] Update cadence is 3 seconds; polling acceptable; ETA computed on backend
+      only.
+- [ ] Data reliability thresholds implemented (Delayed > 15s, Offline > 60s,
+      Hidden > 120s) with last-updated display.
+- [ ] UX copy avoids misleading precision; stale/unknown states are explicit.
+- [ ] Mobile-first performance and graceful degradation on poor connectivity.
+- [ ] Thai-first i18n and accessibility requirements covered (keyboard,
+      contrast, labels).
+- [ ] Security/privacy rules met (HTTPS, no personal data, safe logs).
+- [ ] Engineering quality gates satisfied (tests for ETA/status, linting, code
+      review, no speculative features).
+- [ ] Documentation discipline followed; contracts defined for interfaces.
 
 ## Project Structure
 
