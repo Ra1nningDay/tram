@@ -1,0 +1,11 @@
+{
+  "status.live": "Live",
+  "status.delayed": "Delayed",
+  "status.offline": "Offline",
+  "status.hidden": "Hidden",
+  "eta.updating": "Updating",
+  "eta.none": "No ETA",
+  "banner.stale": "Data may be stale",
+  "banner.offline": "Offline",
+  "no.service": "No shuttles in service"
+}

@@ -1,0 +1,11 @@
+{
+  "status.live": "ออนไลน์",
+  "status.delayed": "หน่วง",
+  "status.offline": "ออฟไลน์",
+  "status.hidden": "ซ่อน",
+  "eta.updating": "กำลังอัปเดต...",
+  "eta.none": "ไม่มีรถที่กำลังมา",
+  "banner.stale": "ข้อมูลไม่เป็นปัจจุบัน",
+  "banner.offline": "ออฟไลน์",
+  "no.service": "ไม่มีบริการ"
+}
