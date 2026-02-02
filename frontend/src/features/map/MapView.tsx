@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { Scan, Plus, Minus } from "lucide-react";
 import maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { config } from "../../lib/config";
@@ -58,16 +59,27 @@ export function MapView({ route, stops, vehicles, onSelectStop, onSelectVehicle 
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapLoadedRef = useRef(false);
 
+  const isMobile = window.innerWidth < 768;
+
   // Calculate bounds from polygon
   const lngs = CAMPUS_POLYGON.map(p => p[0]);
   const lats = CAMPUS_POLYGON.map(p => p[1]);
+  const minLng = Math.min(...lngs);
+  const maxLng = Math.max(...lngs);
+  const minLat = Math.min(...lats);
+  const maxLat = Math.max(...lats);
+  const lngSpan = maxLng - minLng;
+  const latSpan = maxLat - minLat;
+  const boundsPaddingRatio = isMobile ? 0.5 : 0.1;
+  const lngPad = lngSpan * boundsPaddingRatio;
+  const latPad = latSpan * boundsPaddingRatio;
   const campusBounds: maplibregl.LngLatBoundsLike = [
-    [Math.min(...lngs) - 0.002, Math.min(...lats) - 0.002],
-    [Math.max(...lngs) + 0.002, Math.max(...lats) + 0.002],
+    [minLng - lngPad, minLat - latPad],
+    [maxLng + lngPad, maxLat + latPad],
   ];
   const campusCenter: [number, number] = [
-    (Math.min(...lngs) + Math.max(...lngs)) / 2,
-    (Math.min(...lats) + Math.max(...lats)) / 2,
+    (minLng + maxLng) / 2,
+    (minLat + maxLat) / 2,
   ];
 
   // Stable callback refs
@@ -80,11 +92,10 @@ export function MapView({ route, stops, vehicles, onSelectStop, onSelectVehicle 
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
 
-    const styleUrl = `https://api.maptiler.com/maps/${campusConfig.mapStyle}/style.json?key=${config.mapTilerApiKey}`;
+    // Using OpenFreeMap - free, no API key required
+    const styleUrl = "https://tiles.openfreemap.org/styles/liberty";
 
-    // Responsive bearing: Vertical (-90) on mobile, Horizontal (0) on desktop
-    const isMobile = window.innerWidth < 768;
-    const initialBearing = isMobile ? (campusConfig.initialBearing || 0) : 0;
+    const initialBearing = isMobile ? (campusConfig.initialBearing ?? 0) : 0;
 
     const map = new maplibregl.Map({
       container: containerRef.current,
@@ -93,11 +104,8 @@ export function MapView({ route, stops, vehicles, onSelectStop, onSelectVehicle 
       zoom: campusConfig.initialZoom,
       minZoom: campusConfig.minZoom,
       maxZoom: campusConfig.maxZoom,
-      maxBounds: campusBounds,
       bearing: initialBearing,
     });
-
-    map.addControl(new maplibregl.NavigationControl({ showZoom: true }));
 
     map.on("load", () => {
       // Add mask source and layer FIRST (bottom layer)
@@ -204,5 +212,55 @@ export function MapView({ route, stops, vehicles, onSelectStop, onSelectVehicle 
     }
   }, [route, stops, vehicles]);
 
-  return <div ref={containerRef} className="h-full w-full" />;
+  const handleFitBounds = () => {
+    const map = mapRef.current;
+    if (!map) return;
+
+    map.flyTo({
+      center: campusCenter,
+      zoom: campusConfig.initialZoom,
+      bearing: isMobile ? (campusConfig.initialBearing ?? 0) : 0,
+    });
+  };
+
+  const handleZoomIn = () => {
+    mapRef.current?.zoomIn();
+  };
+
+  const handleZoomOut = () => {
+    mapRef.current?.zoomOut();
+  };
+
+  return (
+    <div className="relative h-full w-full">
+      <div ref={containerRef} className="h-full w-full" />
+
+      {/* Custom Navigation Controls (Bottom-Left) */}
+      <div className="absolute bottom-6 left-4 z-10 flex flex-col gap-2">
+        <div className="flex flex-col bg-white rounded-lg shadow-md overflow-hidden border border-gray-100">
+          <button
+            onClick={handleFitBounds}
+            className="p-2 hover:bg-gray-50 focus:outline-none focus:bg-gray-100 text-gray-700 border-b border-gray-100"
+            title="Fit to Campus"
+          >
+            <Scan size={20} />
+          </button>
+          <button
+            onClick={handleZoomIn}
+            className="p-2 hover:bg-gray-50 focus:outline-none focus:bg-gray-100 text-gray-700 border-b border-gray-100"
+            title="Zoom In"
+          >
+            <Plus size={20} />
+          </button>
+          <button
+            onClick={handleZoomOut}
+            className="p-2 hover:bg-gray-50 focus:outline-none focus:bg-gray-100 text-gray-700"
+            title="Zoom Out"
+          >
+            <Minus size={20} />
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 }

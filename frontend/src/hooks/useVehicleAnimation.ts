@@ -47,8 +47,12 @@ function findClosestRouteIndex(stopLat: number, stopLng: number): number {
     return closestIndex;
 }
 
-// Pre-calculate stop indices on the route
-const stopIndices = new Set(stops.map(s => findClosestRouteIndex(s.latitude, s.longitude)));
+// Pre-calculate stop indices and their coordinates
+const stopLocationMap = new Map<number, [number, number]>();
+stops.forEach(s => {
+    const index = findClosestRouteIndex(s.latitude, s.longitude);
+    stopLocationMap.set(index, [s.longitude, s.latitude]);
+});
 
 type AnimatedVehicle = {
     id: string;
@@ -71,8 +75,9 @@ export function useVehicleAnimation(enabled = true) {
 
     // Initialize vehicles at different points on the route
     useEffect(() => {
-        // Slower realistic speed (approx 10x slower than before)
-        const BASE_SPEED = 0.002;
+        // Speed is distance per tick (degrees). Keep consistent speed across segments.
+        const BASE_SPEED = 0.0000013;
+        const SPEED_VARIANCE = 0.0000004;
 
         const initialVehicles: AnimatedVehicle[] = [
             {
@@ -83,7 +88,7 @@ export function useVehicleAnimation(enabled = true) {
                 routeIndex: 0,
                 progress: 0,
                 speed: BASE_SPEED,
-                baseSpeed: BASE_SPEED + Math.random() * 0.0005,
+                baseSpeed: BASE_SPEED + Math.random() * SPEED_VARIANCE,
                 direction: "outbound",
                 status: "fresh",
                 dwellTime: 0,
@@ -96,7 +101,7 @@ export function useVehicleAnimation(enabled = true) {
                 routeIndex: Math.floor(routeCoordinates.length / 3),
                 progress: 0,
                 speed: BASE_SPEED,
-                baseSpeed: BASE_SPEED + Math.random() * 0.0005,
+                baseSpeed: BASE_SPEED + Math.random() * SPEED_VARIANCE,
                 direction: "outbound",
                 status: "fresh",
                 dwellTime: 0,
@@ -109,7 +114,7 @@ export function useVehicleAnimation(enabled = true) {
                 routeIndex: Math.floor((routeCoordinates.length * 2) / 3),
                 progress: 0,
                 speed: BASE_SPEED,
-                baseSpeed: BASE_SPEED + Math.random() * 0.0005,
+                baseSpeed: BASE_SPEED + Math.random() * SPEED_VARIANCE,
                 direction: "outbound",
                 status: "fresh",
                 dwellTime: 0,
@@ -144,21 +149,31 @@ export function useVehicleAnimation(enabled = true) {
                 status = "delayed"; // Show as delayed/waiting while dwelling
                 speed = 0;
 
+                // Keep position snapped to stop while dwelling
+                const exactStopPosition = stopLocationMap.get(routeIndex);
+                if (exactStopPosition) {
+                    position = exactStopPosition;
+                }
+
                 // Finished dwelling
                 if (dwellTime <= 0) {
                     status = "fresh";
                     speed = baseSpeed;
-                    // HACK: Bump progress slightly to avoid immediate re-trigger if index hasn't changed
-                    // But since we trigger on routeIndex change, we should be fine as long as we move.
                 }
 
-                return { ...vehicle, dwellTime, status, speed };
+                return { ...vehicle, dwellTime, status, speed, position };
             }
 
             // Normal movement
             status = "fresh";
             speed = baseSpeed;
-            progress += speed;
+            const nextIndex = routeIndex + 1 >= routeCoordinates.length ? 0 : routeIndex + 1;
+            const currentPointForSpeed = stopLocationMap.get(routeIndex) ?? routeCoordinates[routeIndex];
+            const nextPointForSpeed = stopLocationMap.get(nextIndex) ?? routeCoordinates[nextIndex];
+            const segmentLength = Math.max(getDistance(currentPointForSpeed, nextPointForSpeed), 1e-9);
+            progress += speed / segmentLength;
+
+            let shouldDwell = false;
 
             // Move to next segment if progress >= 1
             while (progress >= 1) {
@@ -170,29 +185,31 @@ export function useVehicleAnimation(enabled = true) {
                     routeIndex = 0;
                 }
 
-                // Check if we arrived at a stop
-                if (stopIndices.has(routeIndex)) {
-                    // Start dwelling
-                    // Random dwell time: 300 - 600 ticks (at 60fps = 5-10 seconds)
-                    dwellTime = 300 + Math.random() * 300;
-                    break; // Stop processing movement for this frame
+                // Check if the NEXT index is a stop - we'll dwell when we arrive there (progress ~= 0)
+                if (stopLocationMap.has(routeIndex)) {
+                    shouldDwell = true;
+                    progress = 0; // Snap progress to exactly 0 at the start of this segment
+                    break;
                 }
             }
 
-            // If currently dwelling (triggered inside the while loop), simplify position update
-            if (dwellTime > 0) {
+            // Calculate interpolated position first (normal movement)
+            const nextPointIndex = routeIndex + 1 >= routeCoordinates.length ? 0 : routeIndex + 1;
+            const currentPoint = stopLocationMap.get(routeIndex) ?? routeCoordinates[routeIndex];
+            const nextPoint = stopLocationMap.get(nextPointIndex) ?? routeCoordinates[nextPointIndex];
+            position = interpolate(currentPoint, nextPoint, progress);
+            heading = getHeading(currentPoint, nextPoint);
+
+            // If we just arrived at a stop, snap to exact stop position and start dwelling
+            if (shouldDwell) {
+                const exactStopPosition = stopLocationMap.get(routeIndex);
+                if (exactStopPosition) {
+                    position = exactStopPosition;
+                }
+                // Random dwell time: 300 - 600 ticks (at 60fps = 5-10 seconds)
+                dwellTime = 300 + Math.random() * 300;
                 status = "delayed";
                 speed = 0;
-                // Snap to the exact coordinate of the stop index
-                const snapPoint = routeCoordinates[routeIndex];
-                position = snapPoint;
-                // Heading remains same as arrival
-            } else {
-                // Calculate interpolated position
-                const currentPoint = routeCoordinates[routeIndex];
-                const nextPoint = routeCoordinates[routeIndex + 1] || routeCoordinates[0];
-                position = interpolate(currentPoint, nextPoint, progress);
-                heading = getHeading(currentPoint, nextPoint);
             }
 
             return {
