@@ -1,0 +1,234 @@
+openapi: 3.1.0
+info:
+  title: Campus Shuttle Public API
+  version: "1.0.0"
+  description: Read-only shuttle data for the public real-time map.
+servers:
+  - url: https://{host}
+    variables:
+      host:
+        default: api.example.edu
+
+paths:
+  /api/route:
+    get:
+      summary: Get campus route details
+      responses:
+        "200":
+          description: Route details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RouteResponse"
+        "503":
+          description: Service unavailable
+  /api/stops:
+    get:
+      summary: Get stop list
+      responses:
+        "200":
+          description: Stops list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StopsResponse"
+        "503":
+          description: Service unavailable
+  /api/vehicles:
+    get:
+      summary: Get live vehicle positions
+      responses:
+        "200":
+          description: Vehicle list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VehiclesResponse"
+        "503":
+          description: Service unavailable
+  /api/stops/{stop_id}/etas:
+    get:
+      summary: Get ETAs for a stop
+      parameters:
+        - name: stop_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Stop ETAs
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EtasResponse"
+        "404":
+          description: Stop not found
+        "503":
+          description: Service unavailable
+
+components:
+  schemas:
+    Status:
+      type: string
+      enum: [fresh, delayed, offline, hidden]
+      description: Data reliability status derived from last_updated age.
+    GeoJsonLineString:
+      type: object
+      required: [type, coordinates]
+      properties:
+        type:
+          type: string
+          enum: [LineString]
+        coordinates:
+          type: array
+          items:
+            type: array
+            minItems: 2
+            maxItems: 2
+            items:
+              type: number
+          description: Array of [lng, lat] pairs.
+    StopRef:
+      type: object
+      required: [id, sequence]
+      properties:
+        id:
+          type: string
+        sequence:
+          type: integer
+          minimum: 1
+    RouteDirection:
+      type: object
+      required: [direction, geometry, stops]
+      properties:
+        direction:
+          type: string
+          enum: [outbound, inbound]
+        geometry:
+          $ref: "#/components/schemas/GeoJsonLineString"
+        stops:
+          type: array
+          items:
+            $ref: "#/components/schemas/StopRef"
+    Route:
+      type: object
+      required: [id, name, directions]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        directions:
+          type: array
+          items:
+            $ref: "#/components/schemas/RouteDirection"
+    Stop:
+      type: object
+      required: [id, name_th, latitude, longitude, sequence, direction]
+      properties:
+        id:
+          type: string
+        name_th:
+          type: string
+        name_en:
+          type: string
+          nullable: true
+        latitude:
+          type: number
+        longitude:
+          type: number
+        sequence:
+          type: integer
+        direction:
+          type: string
+          enum: [outbound, inbound]
+    Vehicle:
+      type: object
+      required: [id, latitude, longitude, direction, last_updated, status]
+      properties:
+        id:
+          type: string
+        label:
+          type: string
+          nullable: true
+        latitude:
+          type: number
+        longitude:
+          type: number
+        heading:
+          type: number
+          nullable: true
+        direction:
+          type: string
+          enum: [outbound, inbound]
+        last_updated:
+          type: string
+          format: date-time
+        status:
+          $ref: "#/components/schemas/Status"
+    Eta:
+      type: object
+      required: [stop_id, eta_minutes, last_updated, status]
+      properties:
+        stop_id:
+          type: string
+        vehicle_id:
+          type: string
+          nullable: true
+        eta_minutes:
+          type: integer
+          minimum: 0
+        arrival_time:
+          type: string
+          format: date-time
+          nullable: true
+        last_updated:
+          type: string
+          format: date-time
+        status:
+          $ref: "#/components/schemas/Status"
+    RouteResponse:
+      type: object
+      required: [server_time, route]
+      properties:
+        server_time:
+          type: string
+          format: date-time
+        route:
+          $ref: "#/components/schemas/Route"
+    StopsResponse:
+      type: object
+      required: [server_time, stops]
+      properties:
+        server_time:
+          type: string
+          format: date-time
+        stops:
+          type: array
+          items:
+            $ref: "#/components/schemas/Stop"
+    VehiclesResponse:
+      type: object
+      required: [server_time, vehicles]
+      properties:
+        server_time:
+          type: string
+          format: date-time
+        vehicles:
+          type: array
+          items:
+            $ref: "#/components/schemas/Vehicle"
+    EtasResponse:
+      type: object
+      required: [server_time, stop_id, etas]
+      properties:
+        server_time:
+          type: string
+          format: date-time
+        stop_id:
+          type: string
+        etas:
+          type: array
+          items:
+            $ref: "#/components/schemas/Eta"

@@ -1,0 +1,22 @@
+# Node/TypeScript
+node_modules/
+dist/
+build/
+coverage/
+*.log
+
+# Env files
+.env
+.env.*
+
+# Tooling
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Temp
+*.tmp
+*.swp
