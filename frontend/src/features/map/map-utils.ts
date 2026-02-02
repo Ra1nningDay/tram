@@ -5,39 +5,62 @@ import React from "react"; // Needed for React.createElement
 
 import { Bus } from "lucide-react";
 
+const MAP_COLORS = {
+    blue: "#3b82f6",
+    red: "#ef4444",
+    green: "#22c55e",
+    purple: "#a855f7",
+    orange: "#f97316",
+    teal: "#14b8a6",
+};
+
 export function loadMapIcons(map: maplibregl.Map) {
     AVAILABLE_ICONS.forEach((icon) => {
-        if (map.hasImage(icon.name)) return;
+        // Generate default (blue) icon usage: "IconName"
+        generateIcon(map, icon.name, icon.component, MAP_COLORS.blue);
 
-        // Render icon to SVG string
-        const svgString = renderToStaticMarkup(
-            React.createElement(icon.component, {
-                size: 40, // Increased from 24
-                color: "#ffffff",
-                strokeWidth: 2,
-            })
-        );
-
-        // Wrap in a colored circle pin
-        // Increased size to 80x80 for higher resolution
-        const markerSvg = `
-        <svg width="80" height="80" viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <circle cx="40" cy="40" r="36" fill="#3b82f6" stroke="white" stroke-width="4"/>
-            <g transform="translate(20, 20)">
-                ${svgString}
-            </g>
-        </svg>
-        `.trim();
-
-        // Convert to image
-        const image = new Image(80, 80);
-        image.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(markerSvg);
-        image.onload = () => {
-            if (!map.hasImage(icon.name)) {
-                map.addImage(icon.name, image, { pixelRatio: 2 });
-            }
-        };
+        // Generate colored variants: "IconName-color"
+        Object.entries(MAP_COLORS).forEach(([colorName, hex]) => {
+            generateIcon(map, `${icon.name}-${colorName}`, icon.component, hex);
+        });
     });
+}
+
+function generateIcon(
+    map: maplibregl.Map,
+    imageName: string,
+    IconComponent: React.ElementType,
+    colorHex: string
+) {
+    if (map.hasImage(imageName)) return;
+
+    // Render icon to SVG string
+    const svgString = renderToStaticMarkup(
+        React.createElement(IconComponent, {
+            size: 40,
+            color: "#ffffff",
+            strokeWidth: 2,
+        })
+    );
+
+    // Wrap in a colored circle pin
+    const markerSvg = `
+    <svg width="80" height="80" viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="40" cy="40" r="36" fill="${colorHex}" stroke="white" stroke-width="4"/>
+        <g transform="translate(20, 20)">
+            ${svgString}
+        </g>
+    </svg>
+    `.trim();
+
+    // Convert to image
+    const image = new Image(80, 80);
+    image.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(markerSvg);
+    image.onload = () => {
+        if (!map.hasImage(imageName)) {
+            map.addImage(imageName, image, { pixelRatio: 2 });
+        }
+    };
 }
 
 export function loadVehicleIcon(map: maplibregl.Map) {

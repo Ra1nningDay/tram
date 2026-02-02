@@ -6,7 +6,7 @@ import { StopPopup } from "../components/StopPopup";
 import { VehiclePopup } from "../components/VehiclePopup";
 import { StatusBanner } from "../components/StatusBanner";
 import { Header } from "../components/Header";
-import { MapLegend } from "../components/MapLegend";
+
 import type { Stop, Vehicle } from "../features/shuttle/api";
 
 export function MapPage() {
@@ -55,8 +55,8 @@ export function MapPage() {
       {/* Status Banner - Top Center */}
       {showStale ? <StatusBanner message="stale" /> : null}
 
-      {/* Legend - Bottom Left */}
-      <MapLegend />
+
+
 
       {/* Vehicle Popup - Bottom Sheet on Mobile, Floating on Desktop */}
       {selectedVehicle ? (

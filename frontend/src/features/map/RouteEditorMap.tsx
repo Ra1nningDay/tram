@@ -130,7 +130,8 @@ export function RouteEditorMap({
     useEffect(() => {
         if (!containerRef.current || mapRef.current) return;
 
-        const styleUrl = `https://api.maptiler.com/maps/streets/style.json?key=${config.mapTilerApiKey}`;
+        // Using OpenFreeMap - free, no API key required
+        const styleUrl = "https://tiles.openfreemap.org/styles/liberty";
         const map = new maplibregl.Map({
             container: containerRef.current,
             style: styleUrl,

@@ -32,7 +32,7 @@ export const vehiclesLayer: SymbolLayerSpecification = {
     "icon-allow-overlap": true,
     // Icon seems to be facing the opposite way of what we expected. 
     // Previous: -90 (Backwards). New: +90 (Should be Forwards).
-    "icon-rotate": ["+", ["get", "heading"], 90],
+    "icon-rotate": ["+", ["get", "heading"], 270],
     "icon-rotation-alignment": "map",
   },
   paint: {

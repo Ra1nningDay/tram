@@ -203,6 +203,18 @@
                         {
                             "id": "stop-5",
                             "sequence": 5
+                        },
+                        {
+                            "id": "stop-6",
+                            "sequence": 6
+                        },
+                        {
+                            "id": "stop-7",
+                            "sequence": 7
+                        },
+                        {
+                            "id": "stop-8",
+                            "sequence": 8
                         }
                     ]
                 }
@@ -212,30 +224,31 @@
     "stops": [
         {
             "id": "stop-1",
-            "name_th": "โรงอาหารกลาง",
-            "name_en": "Central Canteen",
-            "latitude": 14.039625,
-            "longitude": 100.614893,
+            "name_th": "A3",
+            "name_en": "Stop 1",
+            "latitude": 14.039642810676781,
+            "longitude": 100.61480065053723,
             "sequence": 1,
             "direction": "outbound",
-            "icon": "Utensils"
+            "icon": "Building",
+            "color": "blue"
         },
         {
             "id": "stop-2",
-            "name_th": "อาคารเรียนรวมสังคมศาสตร์",
-            "name_en": "Social Sciences Building",
-            "latitude": 14.039940,
-            "longitude": 100.609465,
+            "name_th": "หอสมุด",
+            "name_en": "Stop 2",
+            "latitude": 14.038946355382322,
+            "longitude": 100.60782854650853,
             "sequence": 2,
             "direction": "outbound",
             "icon": "School"
         },
         {
             "id": "stop-3",
-            "name_th": "หอสมุดป๋วย อึ๊งภากรณ์",
-            "name_en": "Puey Ungphakorn Library",
-            "latitude": 14.039050,
-            "longitude": 100.605161,
+            "name_th": "ตึกนิเทศ",
+            "name_en": "Stop 3",
+            "latitude": 14.03972968082951,
+            "longitude": 100.6042289076114,
             "sequence": 3,
             "direction": "outbound",
             "icon": "Building"
@@ -244,21 +257,52 @@
             "id": "stop-4",
             "name_th": "จุดที่ 4",
             "name_en": "Stop 4",
-            "latitude": 14.039974513721432,
-            "longitude": 100.61232899028585,
+            "latitude": 14.03998025674197,
+            "longitude": 100.61225193155087,
             "sequence": 4,
             "direction": "outbound",
-            "icon": "Trees"
+            "icon": "Building"
         },
         {
             "id": "stop-5",
-            "name_th": "จุดที่ 5",
+            "name_th": "โรงอาหารกลาง",
             "name_en": "Stop 5",
-            "latitude": 14.039193515508202,
-            "longitude": 100.61201871421576,
+            "latitude": 14.039201932319855,
+            "longitude": 100.61207393057794,
             "sequence": 5,
             "direction": "outbound",
-            "icon": "Coffee"
+            "icon": "Utensils"
+        },
+        {
+            "id": "stop-6",
+            "name_th": "A4",
+            "name_en": "Stop 6",
+            "latitude": 14.03916490306645,
+            "longitude": 100.61375912691636,
+            "sequence": 6,
+            "direction": "outbound",
+            "icon": "Building"
+        },
+        {
+            "id": "stop-7",
+            "name_th": "A7",
+            "name_en": "Stop 7",
+            "latitude": 14.04000352872768,
+            "longitude": 100.61376780207183,
+            "sequence": 7,
+            "direction": "outbound",
+            "icon": "Building"
+        },
+        {
+            "id": "stop-8",
+            "name_th": "Start",
+            "name_en": "Stop 8",
+            "latitude": 14.039938543459385,
+            "longitude": 100.60185620906617,
+            "sequence": 8,
+            "direction": "outbound",
+            "icon": "MapPin",
+            "color": "red"
         }
     ],
     "vehicles": [

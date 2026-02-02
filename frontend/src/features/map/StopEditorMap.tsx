@@ -13,6 +13,7 @@ type StopMarker = {
     name_th: string;
     name_en: string;
     icon?: string;
+    color?: string;
 };
 
 type StopEditorMapProps = {
@@ -79,7 +80,8 @@ export function StopEditorMap({ isPlacing, stops, onMapClick, onStopMove }: Stop
     useEffect(() => {
         if (!containerRef.current || mapRef.current) return;
 
-        const styleUrl = `https://api.maptiler.com/maps/${campusConfig.mapStyle}/style.json?key=${config.mapTilerApiKey}`;
+        // Using OpenFreeMap - free, no API key required
+        const styleUrl = "https://tiles.openfreemap.org/styles/liberty";
         const map = new maplibregl.Map({
             container: containerRef.current,
             style: styleUrl,
@@ -185,17 +187,23 @@ export function StopEditorMap({ isPlacing, stops, onMapClick, onStopMove }: Stop
         if (source) {
             source.setData({
                 type: "FeatureCollection",
-                features: stops.map((stop, index) => ({
-                    type: "Feature" as const,
-                    geometry: { type: "Point" as const, coordinates: stop.position },
-                    properties: {
-                        index,
-                        label: `${index + 1}`,
-                        name_th: stop.name_th,
-                        name_en: stop.name_en,
-                        icon: stop.icon || "MapPin",
-                    },
-                })),
+                features: stops.map((stop, index) => {
+                    const iconName = stop.icon || "MapPin";
+                    const colorSuffix = stop.color ? `-${stop.color}` : "";
+                    const fullIconName = `${iconName}${colorSuffix}`;
+
+                    return {
+                        type: "Feature" as const,
+                        geometry: { type: "Point" as const, coordinates: stop.position },
+                        properties: {
+                            index,
+                            label: `${index + 1}`,
+                            name_th: stop.name_th,
+                            name_en: stop.name_en,
+                            icon: fullIconName,
+                        },
+                    };
+                }),
             });
         }
     }, [stops, isMapReady]);

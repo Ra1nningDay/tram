@@ -5,7 +5,7 @@ export function Header() {
     const { data } = useVehicles();
 
     const vehicles: Vehicle[] = data?.vehicles ?? [];
-    const onlineCount = vehicles.filter(v => v.status === "fresh").length;
+    const onlineCount = vehicles.filter(v => v.status === "fresh" || v.status === "delayed").length;
     const totalCount = vehicles.length;
 
     return (

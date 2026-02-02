@@ -53,6 +53,7 @@ export function vehiclesToGeoJson(vehicles?: Vehicle[]): FeatureCollection<Point
         direction: vehicle.direction,
         status: vehicle.status,
         last_updated: vehicle.last_updated,
+        heading: vehicle.heading,
       },
     })),
   };
