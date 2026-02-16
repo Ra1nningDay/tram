@@ -26,7 +26,11 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="th" className={`${poppins.variable} ${ibmPlexSansThai.variable}`}>
+    <html
+      lang="th"
+      suppressHydrationWarning
+      className={`${poppins.variable} ${ibmPlexSansThai.variable}`}
+    >
       <body>
         <AppProviders>{children}</AppProviders>
       </body>

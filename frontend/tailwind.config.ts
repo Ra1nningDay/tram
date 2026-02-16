@@ -3,6 +3,7 @@ import tailwindcssAnimate from "tailwindcss-animate";
 import { fontFamily } from "tailwindcss/defaultTheme";
 
 const config: Config = {
+  darkMode: "class",
   content: ["./src/**/*.{js,ts,jsx,tsx,mdx}"],
   theme: {
     extend: {
@@ -28,23 +29,23 @@ const config: Config = {
       },
       colors: {
         primary: {
-          DEFAULT: "#FE5050",
-          dark: "#e03e3e",
+          DEFAULT: "var(--color-primary)",
+          dark: "var(--color-primary-dark)",
         },
         accent: {
-          DEFAULT: "#69542A",
-          light: "#8a7344",
+          DEFAULT: "var(--color-accent)",
+          light: "var(--color-accent-light)",
         },
         surface: {
-          DEFAULT: "#292D32",
-          light: "#343942",
-          lighter: "#3f4550",
-          dark: "#1e2127",
+          DEFAULT: "var(--color-surface)",
+          light: "var(--color-surface-light)",
+          lighter: "var(--color-surface-lighter)",
+          dark: "var(--color-surface-dark)",
         },
-        muted: "#F1EDED",
-        fresh: "#22c55e",
-        delayed: "#f59e0b",
-        offline: "#ef4444",
+        muted: "var(--color-text)",
+        fresh: "var(--color-fresh)",
+        delayed: "var(--color-delayed)",
+        offline: "var(--color-offline)",
       },
       animation: {
         "slide-up": "slideUp 0.3s ease-out",
