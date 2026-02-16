@@ -14,21 +14,24 @@ type EtaWithDetails = Eta & {
 
 export function EtaList({ etas }: { etas: EtaWithDetails[] }) {
   if (!etas.length) {
-    return <div className="text-xs text-slate-500">{t("eta.none")}</div>;
+    return <div className="text-xs text-[var(--color-text-muted)]">{t("eta.none")}</div>;
   }
 
   return (
     <ul className="space-y-2">
       {etas.map((eta) => (
-        <li key={`${eta.stop_id}-${eta.vehicle_id ?? "na"}`} className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 border-b border-slate-100 last:border-0 pb-2 last:pb-0 sm:border-0 sm:pb-0">
+        <li
+          key={`${eta.stop_id}-${eta.vehicle_id ?? "na"}`}
+          className="flex flex-col gap-1 border-b border-[var(--glass-border)] pb-2 last:border-0 last:pb-0 sm:flex-row sm:items-center sm:gap-2 sm:border-0 sm:pb-0"
+        >
           <div className="flex items-center gap-2 justify-between sm:justify-start w-full sm:w-auto">
             <div className="flex items-center gap-2">
               <StatusBadge status={eta.status} />
               <div className="flex flex-col">
-                <span className="text-sm font-medium text-slate-700">
+                <span className="text-sm font-medium text-[var(--color-text)]">
                   {eta.status === "fresh" && eta.eta_minutes >= 0 ? `${eta.eta_minutes} min` : t("eta.updating")}
                 </span>
-                <span className="text-xs text-slate-500">
+                <span className="text-xs text-[var(--color-text-muted)]">
                   {eta.plate ?? eta.vehicle_label ?? eta.vehicle_id ?? ""}
                 </span>
               </div>
@@ -38,7 +41,7 @@ export function EtaList({ etas }: { etas: EtaWithDetails[] }) {
               <LastUpdated lastUpdated={eta.last_updated} />
             </div>
           </div>
-          <div className="text-xs text-slate-500 sm:ml-2">
+          <div className="text-xs text-[var(--color-text-muted)] sm:ml-2">
             <span>
               {typeof eta.distance_meters === "number" ? `${Math.round(eta.distance_meters)}m` : "--"}
             </span>

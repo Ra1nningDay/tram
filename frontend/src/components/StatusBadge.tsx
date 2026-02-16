@@ -4,7 +4,7 @@ import { statusCopy } from "../lib/status-copy";
 export function StatusBadge({ status }: { status: Status }) {
   const label = statusCopy[status]();
   return (
-    <span className="rounded bg-slate-100 px-2 py-1 text-xs text-slate-800">
+    <span className="rounded bg-[var(--color-surface-lighter)] px-2 py-1 text-xs text-[var(--color-text)]">
       {label}
     </span>
   );

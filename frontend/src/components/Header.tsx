@@ -10,7 +10,7 @@ export function Header() {
 
             <div>
                 <h1 className="font-heading text-base font-bold tracking-tight text-muted">BU Tram</h1>
-                <p className="text-xs text-white/40">
+                <p className="text-xs text-[var(--text-faint)]">
                     <span className="inline-flex items-center gap-1">
                         <span className="h-2 w-2 rounded-full bg-fresh animate-pulse-soft" />
                         Live Tracking

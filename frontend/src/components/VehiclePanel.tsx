@@ -29,19 +29,19 @@ function BusCard({
         <div className="relative">
             <button
                 onClick={onSelect}
-                className={`bus-card w-full p-5 text-left transition-all relative overflow-hidden group rounded-2xl ${isSelected ? "bg-surface-light/10" : "bg-transparent hover:bg-white/5"
+                className={`bus-card w-full p-5 text-left transition-all relative overflow-hidden group rounded-2xl ${isSelected ? "bg-surface-light/10" : "bg-transparent hover:bg-[var(--map-control-hover)]"
                     }`}
             >
                 {/* Header Section */}
                 <div className="flex items-start gap-4 mb-3">
                     {/* Large Bus Icon - Clean */}
-                    <Bus size={42} className="text-white shrink-0 mt-1" strokeWidth={1.5} />
+                    <Bus size={42} className="text-[var(--color-text)] shrink-0 mt-1" strokeWidth={1.5} />
 
                     <div className="flex-1 min-w-0">
-                        <h3 className="font-heading text-2xl font-bold text-white tracking-wide leading-tight">
+                        <h3 className="font-heading text-2xl font-bold text-[var(--color-text)] tracking-wide leading-tight">
                             {tele.label}
                         </h3>
-                        <p className="text-xs text-white/40 mt-1 font-light truncate">
+                        <p className="text-xs text-[var(--text-faint)] mt-1 font-light truncate">
                             Lorem Ipsum is simply dummy text
                         </p>
                     </div>
@@ -71,12 +71,12 @@ function BusCard({
                             {isWarning ? "Stopped" : "Normal"}
                         </span>
                     </div>
-                    <div className="font-mono text-white/90 tracking-wider">
-                        <span className="text-white/40 mr-2">»</span>
+                    <div className="font-mono text-[var(--color-text)] tracking-wider">
+                        <span className="text-[var(--text-faint)] mr-2">»</span>
                         {tele.distanceToNextStopM >= 1000
                             ? (tele.distanceToNextStopM / 1000).toFixed(1) + " KM"
                             : Math.round(tele.distanceToNextStopM) + " M"}
-                        <span className="mx-2 text-white/20">|</span>
+                        <span className="mx-2 text-[var(--text-faint)]">|</span>
                         {tele.progressPercent}%
                     </div>
                 </div>
@@ -85,15 +85,15 @@ function BusCard({
                 <div className={`transition-all duration-300 overflow-hidden ${showDetails ? "max-h-[200px] opacity-100 mt-4" : "max-h-0 opacity-0"}`}>
                     <div className="relative pl-3">
                         {/* Vertical Dotted Line */}
-                        <div className="absolute left-[15px] top-4 bottom-4 w-0 border-l-2 border-dotted border-white/20" />
+                        <div className="absolute left-[27px] top-4 bottom-4 w-0 border-l-2 border-dotted border-[var(--glass-border)]" />
 
                         {/* From Stop */}
                         <div className="relative flex items-center gap-4 mb-3">
                             <div className="relative z-10 flex items-center justify-center w-8 h-8">
                                 <div className="w-3 h-3 rounded-full bg-primary ring-4 ring-primary/20" />
                             </div>
-                            <div className="flex-1 py-3 px-4 rounded-xl bg-surface-lighter/30 border border-white/5 shadow-sm">
-                                <span className="text-sm font-medium text-white/90">{tele.prevStopName}</span>
+                            <div className="flex-1 py-3 px-4 rounded-xl bg-surface-lighter/30 border border-[var(--glass-border)] shadow-sm">
+                                <span className="text-sm font-medium text-[var(--color-text)]">{tele.prevStopName}</span>
                             </div>
                         </div>
 
@@ -104,15 +104,15 @@ function BusCard({
                                     <MapPin size={14} className="text-primary" />
                                 </div>
                             </div>
-                            <div className="flex-1 py-3 px-4 rounded-xl bg-surface-lighter/30 border border-white/5 shadow-sm">
-                                <span className="text-sm font-medium text-white/90">{tele.nextStopName}</span>
+                            <div className="flex-1 py-3 px-4 rounded-xl bg-surface-lighter/30 border border-[var(--glass-border)] shadow-sm">
+                                <span className="text-sm font-medium text-[var(--color-text)]">{tele.nextStopName}</span>
                             </div>
                         </div>
                     </div>
                 </div>
             </button>
             {/* Divider Line */}
-            {!isSelected && <div className="mx-6 h-px bg-white/5" />}
+            {!isSelected && <div className="mx-6 h-px bg-[var(--map-control-hover)]" />}
         </div>
     );
 }
@@ -130,8 +130,8 @@ export function VehiclePanel({ vehicles, telemetry, onSelectVehicle, selectedVeh
     return (
         <>
             {/* Desktop side panel */}
-            <div className="hidden md:flex flex-col absolute top-4 right-4 bottom-4 z-20 w-[380px] animate-slideUp">
-                <div className="glass-card-dark flex flex-col h-full overflow-hidden border-white/10 bg-[#1E1E1E]/95 backdrop-blur-xl relative">
+            <div className="hidden md:flex flex-col absolute top-4 right-4 z-20 w-[380px] max-h-[calc(100vh-2rem)] animate-slideUp">
+                <div className="glass-card-dark relative flex flex-col overflow-hidden border-[var(--panel-border)] bg-[var(--glass-strong-bg)] backdrop-blur-xl">
 
                     {/* Header Gradient Line (Top Only) */}
                     <div className="relative z-10 h-2 w-full bg-gradient-to-r from-[#FE5050] to-[#C28437] rounded-t-[14px]" />
@@ -159,23 +159,23 @@ export function VehiclePanel({ vehicles, telemetry, onSelectVehicle, selectedVeh
             {/* Mobile bottom sheet - Toggleable */}
             <div className="md:hidden fixed bottom-0 left-0 right-0 z-20 pointer-events-none flex flex-col justify-end h-[80vh]">
                 <div
-                    className={`glass-card-dark w-full pointer-events-auto transition-all duration-300 ease-spring ${isMobileOpen ? 'h-[70vh]' : 'h-[60px]'} flex flex-col overflow-hidden bg-[#1E1E1E]/95 backdrop-blur-xl border-t border-white/10 rounded-t-2xl shadow-[0_-8px_30px_rgba(0,0,0,0.5)]`}
+                    className={`glass-card-dark w-full pointer-events-auto transition-all duration-300 ease-spring ${isMobileOpen ? 'h-[70vh]' : 'h-[60px]'} flex flex-col overflow-hidden bg-[var(--glass-strong-bg)] backdrop-blur-xl border-t border-[var(--panel-border)] rounded-t-2xl shadow-[0_-8px_30px_rgba(0,0,0,0.5)]`}
                 >
                     {/* Handle Bar Area - Click to toggle */}
                     <div
-                        className="cursor-pointer active:bg-white/5 transition-colors absolute top-0 left-0 right-0 h-[60px] z-30"
+                        className="cursor-pointer active:bg-[var(--map-control-hover)] transition-colors absolute top-0 left-0 right-0 h-[60px] z-30"
                         onClick={() => setIsMobileOpen(!isMobileOpen)}
                     >
                         <div className="h-1.5 w-full bg-gradient-to-r from-[#FE5050] to-[#C28437]" />
                         <div className="flex flex-col items-center justify-center pt-2 pb-1">
-                            <div className="w-12 h-1 rounded-full bg-white/20 mb-1" />
+                            <div className="w-12 h-1 rounded-full bg-[var(--text-faint)] mb-1" />
                             {!isMobileOpen && (
-                                <span className="text-[10px] uppercase tracking-widest text-white/40 font-bold animate-pulse">
+                                <span className="text-[10px] uppercase tracking-widest text-[var(--text-faint)] font-bold animate-pulse">
                                     Tap to Expand
                                 </span>
                             )}
                             {isMobileOpen && (
-                                <ChevronDown size={16} className="text-white/20 animate-bounce mt-1" />
+                                <ChevronDown size={16} className="text-[var(--text-faint)] animate-bounce mt-1" />
                             )}
                         </div>
                     </div>
@@ -202,3 +202,4 @@ export function VehiclePanel({ vehicles, telemetry, onSelectVehicle, selectedVeh
         </>
     );
 }
+

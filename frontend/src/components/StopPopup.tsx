@@ -7,7 +7,7 @@ export function StopPopup({ stop, etas }: { stop: Stop; etas: Eta[] }) {
     <div className="glass-card p-4 w-full md:w-auto md:min-w-[320px] animate-slideUp rounded-t-2xl rounded-b-none md:rounded-2xl shadow-2xl">
       {/* Mobile Drag Handle */}
       <div className="md:hidden w-full flex justify-center mb-3">
-        <div className="w-12 h-1.5 bg-slate-200 rounded-full" />
+        <div className="h-1.5 w-12 rounded-full bg-[var(--color-surface-lighter)]" />
       </div>
 
       <div className="flex items-start gap-3">
@@ -23,16 +23,15 @@ export function StopPopup({ stop, etas }: { stop: Stop; etas: Eta[] }) {
           </svg>
         </div>
         <div className="flex-1">
-          <div className="font-bold text-lg text-slate-800">{stop.name_th}</div>
-          <div className="text-sm text-slate-500">{stop.name_en}</div>
+          <div className="text-lg font-bold text-[var(--color-text)]">{stop.name_th}</div>
+          <div className="text-sm text-[var(--color-text-muted)]">{stop.name_en}</div>
         </div>
       </div>
 
-      <div className="mt-4 border-t border-slate-200/50 pt-3">
-        <p className="mb-2 text-xs font-bold uppercase tracking-wider text-slate-400">{t("eta.coming")}</p>
+      <div className="mt-4 border-t border-[var(--glass-border)]/50 pt-3">
+        <p className="mb-2 text-xs font-bold uppercase tracking-wider text-[var(--text-faint)]">{t("eta.coming")}</p>
         <EtaList etas={etas} />
       </div>
     </div>
   );
 }
-

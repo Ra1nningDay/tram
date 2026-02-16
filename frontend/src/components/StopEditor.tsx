@@ -81,7 +81,7 @@ export function StopEditorControls({
         <div className="glass-card p-4 animate-slideUp min-w-[240px] relative">
             <div className="flex items-center gap-2 mb-3">
                 <MapPin className="h-4 w-4 text-blue-500" />
-                <h3 className="text-sm font-bold text-slate-800">Stop Editor</h3>
+                <h3 className="text-sm font-bold text-[var(--color-text)]">Stop Editor</h3>
             </div>
 
             <div className="flex flex-col gap-2">
@@ -99,7 +99,7 @@ export function StopEditorControls({
 
                 {stops.length > 0 && (
                     <>
-                        <div className="text-xs text-slate-500 text-center">
+                        <div className="text-xs text-[var(--color-text-muted)] text-center">
                             {stops.length} จุด
                         </div>
 
@@ -108,7 +108,7 @@ export function StopEditorControls({
                             {stops.map((stop, index) => (
                                 <div
                                     key={stop.id}
-                                    className="flex items-center gap-2 p-2 bg-slate-50 rounded text-xs"
+                                    className="flex items-center gap-2 p-2 bg-[var(--color-surface-lighter)] rounded text-xs"
                                 >
                                     <span className="w-5 h-5 bg-blue-500 text-white rounded-full flex items-center justify-center text-[10px] font-bold shrink-0">
                                         {index + 1}
@@ -121,7 +121,7 @@ export function StopEditorControls({
                                                     value={stop.name_th}
                                                     onChange={(e) => handleUpdate(index, { name_th: e.target.value })}
                                                     placeholder="ชื่อไทย"
-                                                    className="w-full px-2 py-1 text-xs border rounded focus:ring-1 focus:ring-blue-500 outline-none"
+                                                    className="w-full rounded border border-[var(--glass-border)] bg-[var(--color-surface-light)] px-2 py-1 text-xs text-[var(--color-text)] outline-none focus:ring-1 focus:ring-blue-500"
                                                     autoFocus
                                                 />
                                                 <input
@@ -129,14 +129,14 @@ export function StopEditorControls({
                                                     value={stop.name_en}
                                                     onChange={(e) => handleUpdate(index, { name_en: e.target.value })}
                                                     placeholder="English name"
-                                                    className="w-full px-2 py-1 text-xs border rounded focus:ring-1 focus:ring-blue-500 outline-none"
+                                                    className="w-full rounded border border-[var(--glass-border)] bg-[var(--color-surface-light)] px-2 py-1 text-xs text-[var(--color-text)] outline-none focus:ring-1 focus:ring-blue-500"
                                                 />
                                                 <div className="flex flex-wrap gap-1">
                                                     {AVAILABLE_ICONS.map((icon) => (
                                                         <button
                                                             key={icon.name}
                                                             onClick={() => handleUpdate(index, { icon: icon.name })}
-                                                            className={`p-1 rounded text-xs border transition-colors ${stop.icon === icon.name ? "bg-blue-100 border-blue-500 text-blue-600" : "bg-white border-gray-200 text-slate-500 hover:bg-slate-50"}`}
+                                                            className={`p-1 rounded text-xs border transition-colors ${stop.icon === icon.name ? "bg-blue-100 border-blue-500 text-blue-600" : "bg-[var(--color-surface-light)] border-[var(--glass-border)] text-[var(--color-text-muted)] hover:bg-[var(--color-surface-lighter)]"}`}
                                                             title={icon.label}
                                                         >
                                                             <icon.component className="h-3 w-3" />
@@ -144,7 +144,7 @@ export function StopEditorControls({
                                                     ))}
                                                 </div>
 
-                                                <div className="flex flex-wrap gap-1 pt-1 border-t border-slate-100">
+                                                <div className="flex flex-wrap gap-1 pt-1 border-t border-[var(--glass-border)]">
                                                     {AVAILABLE_COLORS.map((color) => (
                                                         <button
                                                             key={color.name}
@@ -170,7 +170,7 @@ export function StopEditorControls({
                                     {editingIndex !== index && (
                                         <button
                                             onClick={() => handleEditStart(index)}
-                                            className="text-slate-400 hover:text-blue-500 p-1"
+                                            className="text-[var(--text-faint)] hover:text-blue-500 p-1"
                                         >
                                             <Edit3 className="h-3 w-3" />
                                         </button>
@@ -182,14 +182,14 @@ export function StopEditorControls({
                         <div className="flex gap-2">
                             <button
                                 onClick={onUndo}
-                                className="flex-1 flex items-center justify-center gap-1 rounded-lg bg-slate-100 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-200"
+                                className="flex-1 flex items-center justify-center gap-1 rounded-lg bg-[var(--color-surface-lighter)] px-3 py-2 text-sm font-medium text-[var(--color-text)] hover:brightness-95"
                             >
                                 <Undo2 className="h-4 w-4" />
                             </button>
 
                             <button
                                 onClick={handleClear}
-                                className="flex-1 flex items-center justify-center gap-1 rounded-lg bg-slate-100 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-200"
+                                className="flex-1 flex items-center justify-center gap-1 rounded-lg bg-[var(--color-surface-lighter)] px-3 py-2 text-sm font-medium text-[var(--color-text)] hover:brightness-95"
                             >
                                 <Trash2 className="h-4 w-4" />
                             </button>
@@ -216,25 +216,25 @@ export function StopEditorControls({
             </div>
 
             {isPlacing && (
-                <p className="mt-3 text-xs text-slate-500 text-center">
+                <p className="mt-3 text-xs text-[var(--color-text-muted)] text-center">
                     คลิกบนแมพเพื่อวาง Stop
                 </p>
             )}
 
             {/* Confirmation Overlay */}
             {showClearConfirm && (
-                <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-3 rounded-2xl bg-white/90 p-4 backdrop-blur-sm transition-all duration-200">
+                <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-3 rounded-2xl bg-[var(--glass-strong-bg)] p-4 backdrop-blur-sm transition-all duration-200">
                     <div className="flex flex-col items-center gap-1 text-center">
                         <div className="flex h-10 w-10 items-center justify-center rounded-full bg-red-100 text-red-600">
                             <Trash2 className="h-5 w-5" />
                         </div>
-                        <p className="font-semibold text-slate-800">ลบจุดจอดทั้งหมด?</p>
-                        <p className="text-xs text-slate-500">การกระทำนี้ไม่สามารถย้อนกลับได้</p>
+                        <p className="font-semibold text-[var(--color-text)]">ลบจุดจอดทั้งหมด?</p>
+                        <p className="text-xs text-[var(--color-text-muted)]">การกระทำนี้ไม่สามารถย้อนกลับได้</p>
                     </div>
                     <div className="flex w-full gap-2">
                         <button
                             onClick={() => setShowClearConfirm(false)}
-                            className="flex-1 rounded-lg bg-slate-100 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-200"
+                            className="flex-1 rounded-lg bg-[var(--color-surface-lighter)] px-3 py-2 text-sm font-medium text-[var(--color-text-muted)] hover:brightness-95"
                         >
                             ยกเลิก
                         </button>
@@ -350,3 +350,5 @@ export function useStopEditor() {
         exportStops,
     };
 }
+
+
