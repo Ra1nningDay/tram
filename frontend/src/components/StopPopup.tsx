@@ -1,4 +1,5 @@
 import type { Stop, Eta } from "../features/shuttle/api";
+import { t } from "../i18n";
 import { EtaList } from "./EtaList";
 
 export function StopPopup({ stop, etas }: { stop: Stop; etas: Eta[] }) {
@@ -13,7 +14,11 @@ export function StopPopup({ stop, etas }: { stop: Stop; etas: Eta[] }) {
         {/* Stop Icon */}
         <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-blue-600 text-white shadow-md">
           <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"
+            />
             <path strokeLinecap="round" strokeLinejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
           </svg>
         </div>
@@ -22,10 +27,12 @@ export function StopPopup({ stop, etas }: { stop: Stop; etas: Eta[] }) {
           <div className="text-sm text-slate-500">{stop.name_en}</div>
         </div>
       </div>
+
       <div className="mt-4 border-t border-slate-200/50 pt-3">
-        <p className="mb-2 text-xs font-bold uppercase tracking-wider text-slate-400">รถที่กำลังมา</p>
+        <p className="mb-2 text-xs font-bold uppercase tracking-wider text-slate-400">{t("eta.coming")}</p>
         <EtaList etas={etas} />
       </div>
     </div>
   );
 }
+

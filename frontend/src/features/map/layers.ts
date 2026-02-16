@@ -17,7 +17,9 @@ export const stopsLayer: SymbolLayerSpecification = {
   source: "stops",
   layout: {
     "icon-image": ["get", "icon"],
-    "icon-size": 1.0, // 80x80 origin @ 2x pixelRatio = 40px logical size
+    // Scale stop icons with zoom so they stay readable when zooming in.
+    // Base assets are 80x80 @ pixelRatio=2 (so ~40px at icon-size=1).
+    "icon-size": ["interpolate", ["linear"], ["zoom"], 13.5, 0.75, 15, 0.9, 16.5, 1.05, 18, 1.25],
     "icon-allow-overlap": true,
   },
 };
@@ -27,13 +29,15 @@ export const vehiclesLayer: SymbolLayerSpecification = {
   type: "symbol",
   source: "vehicles",
   layout: {
-    "icon-image": "Vehicle",
-    "icon-size": 1.0,
+    // Use precomputed properties from `vehiclesToGeoJson` to avoid complex expressions.
+    "icon-image": ["coalesce", ["get", "icon_image"], "Vehicle"],
+    // Scale vehicle icon with zoom so it's readable when zoomed in, but not huge when zoomed out.
+    "icon-size": ["interpolate", ["linear"], ["zoom"], 13, 0.7, 15, 0.9, 17, 1.15, 19, 1.5, 21, 1.9],
     "icon-allow-overlap": true,
-    // Icon seems to be facing the opposite way of what we expected. 
-    // Previous: -90 (Backwards). New: +90 (Should be Forwards).
-    "icon-rotate": ["+", ["get", "heading"], 270],
-    "icon-rotation-alignment": "map",
+    "icon-keep-upright": true,
+    "icon-rotate": 0, // icon-rotate is managed by source (always 0 now, just flipping)
+    "icon-rotation-alignment": "viewport",
+    "icon-ignore-placement": true,
   },
   paint: {
     "icon-color": [

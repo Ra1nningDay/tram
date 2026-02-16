@@ -1,11 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import maplibregl from "maplibre-gl";
-import "maplibre-gl/dist/maplibre-gl.css";
-import { config } from "../../lib/config";
 import campusConfig from "../../data/campus-config.json";
 import type { CircleLayerSpecification, SymbolLayerSpecification } from "maplibre-gl";
 
 import { loadMapIcons } from "./map-utils";
+import { getCampusViewport } from "./campus-viewport";
 
 type StopMarker = {
     id: string;
@@ -28,9 +27,40 @@ const stopMarkersLayer: SymbolLayerSpecification = {
     type: "symbol",
     source: "stop-markers",
     layout: {
-        "icon-image": ["get", "icon"],
-        "icon-size": 1.0,
+        "icon-image": ["coalesce", ["get", "icon"], "MapPin"],
+        // Keep stops readable when zooming (editor typically uses wider zoom range than the main map).
+        "icon-size": ["interpolate", ["linear"], ["zoom"], 14, 0.7, 16, 0.9, 18, 1.1, 20, 1.35],
         "icon-allow-overlap": true,
+    },
+};
+
+// Fallback layer (doesn't depend on icons). If icons fail to load, stops are still visible.
+const stopMarkersFallbackLayer: CircleLayerSpecification = {
+    id: "stop-markers-fallback",
+    type: "circle",
+    source: "stop-markers",
+    paint: {
+        "circle-radius": ["interpolate", ["linear"], ["zoom"], 14, 6, 16, 8, 18, 10, 20, 12],
+        "circle-color": [
+            "match",
+            ["get", "color"],
+            "blue",
+            "#3b82f6",
+            "red",
+            "#ef4444",
+            "green",
+            "#22c55e",
+            "purple",
+            "#a855f7",
+            "orange",
+            "#f97316",
+            "teal",
+            "#14b8a6",
+            "#3b82f6",
+        ],
+        "circle-opacity": 0.95,
+        "circle-stroke-color": "#ffffff",
+        "circle-stroke-width": 2,
     },
 };
 
@@ -41,7 +71,6 @@ const stopLabelsLayer: SymbolLayerSpecification = {
     layout: {
         "text-field": ["get", "label"],
         "text-size": 10,
-        "text-font": ["Open Sans Bold"],
         "text-allow-overlap": true,
         "text-offset": [0, 2], // Move text below icon (adjusted for larger icon)
     },
@@ -58,17 +87,8 @@ export function StopEditorMap({ isPlacing, stops, onMapClick, onStopMove }: Stop
     const [isMapReady, setIsMapReady] = useState(false);
     const draggingRef = useRef<number | null>(null);
 
-    // Calculate bounds from polygon
-    const lngs = (campusConfig.polygon as [number, number][]).map((p) => p[0]);
-    const lats = (campusConfig.polygon as [number, number][]).map((p) => p[1]);
-    const campusBounds: maplibregl.LngLatBoundsLike = [
-        [Math.min(...lngs) - 0.005, Math.min(...lats) - 0.005],
-        [Math.max(...lngs) + 0.005, Math.max(...lats) + 0.005],
-    ];
-    const campusCenter: [number, number] = [
-        (Math.min(...lngs) + Math.max(...lngs)) / 2,
-        (Math.min(...lats) + Math.max(...lats)) / 2,
-    ];
+    const isMobile = window.innerWidth < 768;
+    const { campusBounds, campusCenter } = getCampusViewport(campusConfig.polygon as [number, number][], { isMobile });
 
     const onMapClickRef = useRef(onMapClick);
     onMapClickRef.current = onMapClick;
@@ -86,8 +106,9 @@ export function StopEditorMap({ isPlacing, stops, onMapClick, onStopMove }: Stop
             container: containerRef.current,
             style: styleUrl,
             center: campusCenter,
-            zoom: 16,
-            minZoom: 14,
+            zoom: campusConfig.initialZoom,
+            minZoom: campusConfig.minZoom,
+            maxZoom: campusConfig.maxZoom,
             maxBounds: campusBounds,
         });
 
@@ -99,10 +120,16 @@ export function StopEditorMap({ isPlacing, stops, onMapClick, onStopMove }: Stop
                 data: { type: "FeatureCollection", features: [] },
             });
 
+            map.addLayer(stopMarkersFallbackLayer);
             map.addLayer(stopMarkersLayer);
             map.addLayer(stopLabelsLayer);
 
             loadMapIcons(map);
+
+            // If a symbol requests an icon that isn't in the style yet, re-load icons.
+            map.on("styleimagemissing", () => {
+                loadMapIcons(map);
+            });
 
             setIsMapReady(true);
         });
@@ -183,6 +210,9 @@ export function StopEditorMap({ isPlacing, stops, onMapClick, onStopMove }: Stop
         const map = mapRef.current;
         if (!map || !isMapReady) return;
 
+        // Fast Refresh can preserve the Map instance; ensure stop icons are present even after HMR.
+        loadMapIcons(map);
+
         const source = map.getSource("stop-markers") as maplibregl.GeoJSONSource | undefined;
         if (source) {
             source.setData({
@@ -201,10 +231,12 @@ export function StopEditorMap({ isPlacing, stops, onMapClick, onStopMove }: Stop
                             name_th: stop.name_th,
                             name_en: stop.name_en,
                             icon: fullIconName,
+                            color: stop.color ?? "blue",
                         },
                     };
                 }),
             });
+            map.triggerRepaint();
         }
     }, [stops, isMapReady]);
 

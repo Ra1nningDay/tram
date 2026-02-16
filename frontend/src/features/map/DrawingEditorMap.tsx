@@ -1,9 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import maplibregl from "maplibre-gl";
-import "maplibre-gl/dist/maplibre-gl.css";
-import { config } from "../../lib/config";
 import type { LineLayerSpecification, CircleLayerSpecification, FillLayerSpecification } from "maplibre-gl";
 import campusConfig from "../../data/campus-config.json";
+import { getCampusViewport } from "./campus-viewport";
 
 type DrawMode = "route" | "polygon";
 
@@ -69,17 +68,8 @@ export function DrawingEditorMap({ mode, isDrawing, points, onMapClick, onPointM
     const [isMapReady, setIsMapReady] = useState(false);
     const draggingPointRef = useRef<number | null>(null);
 
-    // Calculate bounds like in StopEditorMap
-    const lngs = (campusConfig.polygon as [number, number][]).map((p) => p[0]);
-    const lats = (campusConfig.polygon as [number, number][]).map((p) => p[1]);
-    const campusBounds: maplibregl.LngLatBoundsLike = [
-        [Math.min(...lngs) - 0.005, Math.min(...lats) - 0.005],
-        [Math.max(...lngs) + 0.005, Math.max(...lats) + 0.005],
-    ];
-    const campusCenter: [number, number] = [
-        (Math.min(...lngs) + Math.max(...lngs)) / 2,
-        (Math.min(...lats) + Math.max(...lats)) / 2,
-    ];
+    const isMobile = window.innerWidth < 768;
+    const { campusBounds, campusCenter } = getCampusViewport(campusConfig.polygon as [number, number][], { isMobile });
 
     const onMapClickRef = useRef(onMapClick);
     const onPointMoveRef = useRef(onPointMove);
@@ -102,8 +92,9 @@ export function DrawingEditorMap({ mode, isDrawing, points, onMapClick, onPointM
             container: containerRef.current,
             style: styleUrl,
             center: campusCenter,
-            zoom: 16,
-            minZoom: 14,
+            zoom: campusConfig.initialZoom,
+            minZoom: campusConfig.minZoom,
+            maxZoom: campusConfig.maxZoom,
             maxBounds: campusBounds,
         });
 

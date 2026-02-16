@@ -1,8 +1,8 @@
 import { useEffect, useRef } from "react";
 import maplibregl from "maplibre-gl";
-import "maplibre-gl/dist/maplibre-gl.css";
-import { config } from "../../lib/config";
 import type { LineLayerSpecification, CircleLayerSpecification, FillLayerSpecification } from "maplibre-gl";
+import campusConfig from "../../data/campus-config.json";
+import { getCampusViewport } from "./campus-viewport";
 
 type RouteEditorMapProps = {
     isDrawingRoute: boolean;
@@ -116,11 +116,8 @@ export function RouteEditorMap({
     const containerRef = useRef<HTMLDivElement | null>(null);
     const mapLoadedRef = useRef(false);
 
-    const campusBounds: maplibregl.LngLatBoundsLike = [
-        [100.580, 14.020],
-        [100.650, 14.060],
-    ];
-    const campusCenter: [number, number] = [100.610, 14.039];
+    const isMobile = window.innerWidth < 768;
+    const { campusBounds, campusCenter } = getCampusViewport(campusConfig.polygon as [number, number][], { isMobile });
 
     const onMapClickRef = useRef(onMapClick);
     onMapClickRef.current = onMapClick;
@@ -136,8 +133,9 @@ export function RouteEditorMap({
             container: containerRef.current,
             style: styleUrl,
             center: campusCenter,
-            zoom: 15,
-            minZoom: 12,
+            zoom: campusConfig.initialZoom,
+            minZoom: campusConfig.minZoom,
+            maxZoom: campusConfig.maxZoom,
             maxBounds: campusBounds,
         });
 

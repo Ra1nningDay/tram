@@ -7,5 +7,12 @@
   "eta.none": "No ETA",
   "banner.stale": "Data may be stale",
   "banner.offline": "Offline",
-  "no.service": "No shuttles in service"
+  "no.service": "No shuttles in service",
+  "vehicle.speed": "Speed",
+  "vehicle.next_stop": "Next stop",
+  "eta.distance": "Distance",
+  "eta.arrival_time": "Arrival time",
+  "eta.coming": "Approaching vehicles",
+  "updated.latest": "Last updated",
+  "time.ago": "ago"
 }

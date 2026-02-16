@@ -1,14 +1,13 @@
 import { useEffect, useRef } from "react";
 import { Scan, Plus, Minus } from "lucide-react";
 import maplibregl from "maplibre-gl";
-import "maplibre-gl/dist/maplibre-gl.css";
-import { config } from "../../lib/config";
 import { routeLayer, stopsLayer, vehiclesLayer } from "./layers";
 import { routeToGeoJson, stopsToGeoJson, vehiclesToGeoJson } from "./sources";
 import { loadMapIcons, loadVehicleIcon } from "./map-utils";
+import { getCampusViewport } from "./campus-viewport";
 
 import type { Route, Stop, Vehicle } from "../shuttle/api";
-import type { FillLayerSpecification } from "maplibre-gl";
+import type { FillLayerSpecification, LineLayerSpecification } from "maplibre-gl";
 import campusConfig from "../../data/campus-config.json";
 
 type MapViewProps = {
@@ -17,83 +16,68 @@ type MapViewProps = {
   vehicles?: Vehicle[];
   onSelectStop: (stopId: string) => void;
   onSelectVehicle: (vehicleId: string) => void;
+  onMapReady?: (map: maplibregl.Map) => void;
 };
 
 // BU Campus polygon mask (from JSON config)
 const CAMPUS_POLYGON: [number, number][] = campusConfig.polygon as [number, number][];
 
-// Create inverted polygon that covers entire world EXCEPT campus
-function createMaskPolygon() {
-  // Outer ring - covers whole world
-  const outer = [
-    [-180, -90],
-    [180, -90],
-    [180, 90],
-    [-180, 90],
-    [-180, -90],
-  ];
+// Create a closed LineString around the campus boundary
+function createBoundaryLine() {
+  // Ensure the ring is closed
+  const coords = [...CAMPUS_POLYGON];
+  const first = coords[0];
+  const last = coords[coords.length - 1];
+  if (first[0] !== last[0] || first[1] !== last[1]) {
+    coords.push(first);
+  }
 
   return {
     type: "Feature" as const,
     geometry: {
-      type: "Polygon" as const,
-      coordinates: [outer, CAMPUS_POLYGON],
+      type: "LineString" as const,
+      coordinates: coords,
     },
     properties: {},
   };
 }
 
-// Mask layer - white fill outside campus
-const maskLayer: FillLayerSpecification = {
-  id: "campus-mask",
-  type: "fill",
-  source: "campus-mask",
+// Campus boundary outline layer
+const boundaryLayer: LineLayerSpecification = {
+  id: "campus-boundary",
+  type: "line",
+  source: "campus-boundary",
   paint: {
-    "fill-color": campusConfig.maskColor,
-    "fill-opacity": campusConfig.maskOpacity,
+    "line-color": "#FE5050",
+    "line-width": 2,
+    "line-opacity": 0.5,
+    "line-dasharray": [4, 3],
   },
 };
 
-export function MapView({ route, stops, vehicles, onSelectStop, onSelectVehicle }: MapViewProps) {
+export function MapView({ route, stops, vehicles, onSelectStop, onSelectVehicle, onMapReady }: MapViewProps) {
   const mapRef = useRef<maplibregl.Map | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapLoadedRef = useRef(false);
 
   const isMobile = window.innerWidth < 768;
 
-  // Calculate bounds from polygon
-  const lngs = CAMPUS_POLYGON.map(p => p[0]);
-  const lats = CAMPUS_POLYGON.map(p => p[1]);
-  const minLng = Math.min(...lngs);
-  const maxLng = Math.max(...lngs);
-  const minLat = Math.min(...lats);
-  const maxLat = Math.max(...lats);
-  const lngSpan = maxLng - minLng;
-  const latSpan = maxLat - minLat;
-  const boundsPaddingRatio = isMobile ? 0.5 : 0.1;
-  const lngPad = lngSpan * boundsPaddingRatio;
-  const latPad = latSpan * boundsPaddingRatio;
-  const campusBounds: maplibregl.LngLatBoundsLike = [
-    [minLng - lngPad, minLat - latPad],
-    [maxLng + lngPad, maxLat + latPad],
-  ];
-  const campusCenter: [number, number] = [
-    (minLng + maxLng) / 2,
-    (minLat + maxLat) / 2,
-  ];
+  const { campusCenter } = getCampusViewport(CAMPUS_POLYGON, { isMobile });
 
   // Stable callback refs
   const onSelectStopRef = useRef(onSelectStop);
   const onSelectVehicleRef = useRef(onSelectVehicle);
+  const onMapReadyRef = useRef(onMapReady);
   onSelectStopRef.current = onSelectStop;
   onSelectVehicleRef.current = onSelectVehicle;
+  onMapReadyRef.current = onMapReady;
 
   // Initialize map ONCE
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
 
-    // Using OpenFreeMap - free, no API key required
-    const styleUrl = "https://tiles.openfreemap.org/styles/liberty";
+    // Using OpenFreeMap dark style - free, no API key required
+    const styleUrl = "https://tiles.openfreemap.org/styles/dark";
 
     const initialBearing = isMobile ? (campusConfig.initialBearing ?? 0) : 0;
 
@@ -108,12 +92,12 @@ export function MapView({ route, stops, vehicles, onSelectStop, onSelectVehicle 
     });
 
     map.on("load", () => {
-      // Add mask source and layer FIRST (bottom layer)
-      map.addSource("campus-mask", {
+      // Add campus boundary outline
+      map.addSource("campus-boundary", {
         type: "geojson",
-        data: createMaskPolygon(),
+        data: createBoundaryLine(),
       });
-      map.addLayer(maskLayer);
+      map.addLayer(boundaryLayer);
 
       // Add data sources
       map.addSource("route", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
@@ -140,6 +124,7 @@ export function MapView({ route, stops, vehicles, onSelectStop, onSelectVehicle 
       });
 
       mapLoadedRef.current = true;
+      onMapReadyRef.current?.(map);
     });
 
     mapRef.current = map;
@@ -177,6 +162,9 @@ export function MapView({ route, stops, vehicles, onSelectStop, onSelectVehicle 
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !mapLoadedRef.current) return;
+
+    // Fast Refresh can preserve the Map instance; ensure vehicle icons are present even after HMR.
+    loadVehicleIcon(map);
 
     const source = map.getSource("vehicles") as maplibregl.GeoJSONSource | undefined;
     if (source) {
@@ -235,26 +223,26 @@ export function MapView({ route, stops, vehicles, onSelectStop, onSelectVehicle 
     <div className="relative h-full w-full">
       <div ref={containerRef} className="h-full w-full" />
 
-      {/* Custom Navigation Controls (Bottom-Left) */}
-      <div className="absolute bottom-6 left-4 z-10 flex flex-col gap-2">
-        <div className="flex flex-col bg-white rounded-lg shadow-md overflow-hidden border border-gray-100">
+      {/* Custom Navigation Controls (Mobile: Top-Right, Desktop: Bottom-Left) */}
+      <div className="absolute top-5 right-4 md:top-auto md:right-auto md:bottom-6 md:left-4 z-10 flex flex-col gap-2">
+        <div className="flex flex-col rounded-lg shadow-lg overflow-hidden border border-white/10" style={{ background: 'rgba(41,45,50,0.9)' }}>
           <button
             onClick={handleFitBounds}
-            className="p-2 hover:bg-gray-50 focus:outline-none focus:bg-gray-100 text-gray-700 border-b border-gray-100"
+            className="p-2 hover:bg-white/10 focus:outline-none text-muted border-b border-white/10"
             title="Fit to Campus"
           >
             <Scan size={20} />
           </button>
           <button
             onClick={handleZoomIn}
-            className="p-2 hover:bg-gray-50 focus:outline-none focus:bg-gray-100 text-gray-700 border-b border-gray-100"
+            className="p-2 hover:bg-white/10 focus:outline-none text-muted border-b border-white/10"
             title="Zoom In"
           >
             <Plus size={20} />
           </button>
           <button
             onClick={handleZoomOut}
-            className="p-2 hover:bg-gray-50 focus:outline-none focus:bg-gray-100 text-gray-700"
+            className="p-2 hover:bg-white/10 focus:outline-none text-muted"
             title="Zoom Out"
           >
             <Minus size={20} />

@@ -64,31 +64,44 @@ function generateIcon(
 }
 
 export function loadVehicleIcon(map: maplibregl.Map) {
-    if (map.hasImage("Vehicle")) return;
+    // Used by the vehicles layer to keep the icon upright (never upside down):
+    // it swaps between the normal and horizontally-mirrored images based on heading.
+    if (map.hasImage("Vehicle") && map.hasImage("VehicleFlipped")) return;
 
-    // Render Bus icon for SDF (White stroke)
-    const svgString = renderToStaticMarkup(
+    const rawSvg = renderToStaticMarkup(
         React.createElement(Bus, {
             size: 40,
             color: "#ffffff",
             strokeWidth: 2.5,
-            fill: "#ffffff", // Semi-filled
-            fillOpacity: 0.3
+            fill: "#ffffff",
+            fillOpacity: 0.3,
         })
     );
 
-    const markerSvg = `
-    <svg width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg">
-        ${svgString}
-    </svg>
-    `.trim();
+    // Extract inner SVG markup so we can wrap it with transforms (mirror) cleanly.
+    const inner = rawSvg
+        .replace(/^<svg[^>]*>/, "")
+        .replace(/<\/svg>\s*$/, "");
 
-    const image = new Image(40, 40);
-    image.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(markerSvg);
-    image.onload = () => {
-        if (!map.hasImage("Vehicle")) {
-            // Load as SDF to allow dynamic coloring via icon-color
-            map.addImage("Vehicle", image, { sdf: true });
-        }
+    const buildMarkerSvg = (flipped: boolean) => {
+        const g = flipped ? `<g transform="translate(40, 0) scale(-1, 1)">${inner}</g>` : `<g>${inner}</g>`;
+        return `
+        <svg width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg">
+            ${g}
+        </svg>
+        `.trim();
     };
+
+    const add = (name: string, svg: string) => {
+        const image = new Image(40, 40);
+        image.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg);
+        image.onload = () => {
+            if (!map.hasImage(name)) {
+                map.addImage(name, image, { sdf: true });
+            }
+        };
+    };
+
+    if (!map.hasImage("Vehicle")) add("Vehicle", buildMarkerSvg(false));
+    if (!map.hasImage("VehicleFlipped")) add("VehicleFlipped", buildMarkerSvg(true));
 }

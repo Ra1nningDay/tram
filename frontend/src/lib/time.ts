@@ -6,6 +6,12 @@ export function formatAge(lastUpdatedIso: string): string {
   return `${Math.round(ageSeconds / 60)}m`;
 }
 
+export function formatClockTime(iso: string, locale?: string): string {
+  const d = new Date(iso);
+  if (!Number.isFinite(d.getTime())) return "--:--";
+  return d.toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit", hour12: false });
+}
+
 export function isStale(status: Status) {
   return status === "delayed" || status === "offline";
 }

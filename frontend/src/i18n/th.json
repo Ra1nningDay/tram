@@ -1,11 +1,19 @@
 {
   "status.live": "ออนไลน์",
-  "status.delayed": "หน่วง",
+  "status.delayed": "ล่าช้า",
   "status.offline": "ออฟไลน์",
   "status.hidden": "ซ่อน",
   "eta.updating": "กำลังอัปเดต...",
   "eta.none": "ไม่มีรถที่กำลังมา",
-  "banner.stale": "ข้อมูลไม่เป็นปัจจุบัน",
+  "eta.coming": "รถที่กำลังมา",
+  "banner.stale": "ข้อมูลอาจไม่เป็นปัจจุบัน",
   "banner.offline": "ออฟไลน์",
-  "no.service": "ไม่มีบริการ"
+  "no.service": "ไม่มีบริการ",
+  "vehicle.speed": "ความเร็ว",
+  "vehicle.next_stop": "ป้ายถัดไป",
+  "eta.distance": "ระยะทาง",
+  "eta.arrival_time": "เวลาถึง",
+  "updated.latest": "อัปเดตล่าสุด",
+  "time.ago": "ที่ผ่านมา"
 }
+

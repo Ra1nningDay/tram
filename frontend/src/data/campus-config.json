@@ -37,7 +37,7 @@
     "initialZoom": 15,
     "minZoom": 13.5,
     "maxZoom": 18,
-    "maskOpacity": 0.95,
-    "maskColor": "#f8fafc",
+    "maskOpacity": 0.85,
+    "maskColor": "#1e2127",
     "initialBearing": -90
 }
