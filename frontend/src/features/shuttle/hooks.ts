@@ -3,8 +3,9 @@ import { api } from "./api";
 import { mockRoute, mockStops, mockVehicles, getMockEtasForStop } from "./mock-data";
 
 const REFRESH_MS = 3000;
-// Use mock data in development OR if explicitly enabled via VITE_USE_MOCK
-const USE_MOCK = import.meta.env.DEV || import.meta.env.VITE_USE_MOCK === "true";
+// Use mock data in development OR if explicitly enabled via NEXT_PUBLIC_USE_MOCK.
+const USE_MOCK =
+  process.env.NODE_ENV === "development" || process.env.NEXT_PUBLIC_USE_MOCK === "true";
 
 export function useRoute() {
   return useQuery({
