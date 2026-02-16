@@ -1,6 +1,6 @@
 import type { VehicleTelemetry } from "../hooks/useGpsReplay";
 import type { Vehicle } from "../features/shuttle/api";
-import { Bus, User, MapPin, ChevronDown } from "lucide-react";
+import { Bus, User, MapPin, ChevronDown, Clock, Info } from "lucide-react";
 import { useEffect, useState } from "react";
 
 interface VehiclePanelProps {
@@ -8,6 +8,16 @@ interface VehiclePanelProps {
     telemetry: VehicleTelemetry[];
     onSelectVehicle?: (id: string) => void;
     selectedVehicleId?: string | null;
+}
+
+/** Calculate ETA string from distance (meters) and speed (km/h) */
+function formatETA(distanceM: number, speedKmh: number): string {
+    if (speedKmh < 0.5) return "รอออกตัว";
+    const hours = (distanceM / 1000) / speedKmh;
+    const minutes = Math.round(hours * 60);
+    if (minutes < 1) return "< 1 นาที";
+    if (minutes === 1) return "~1 นาที";
+    return `~${minutes} นาที`;
 }
 
 function BusCard({
@@ -23,7 +33,8 @@ function BusCard({
     isFirst: boolean;
 }) {
     const isWarning = tele.status === "warning";
-    const showDetails = isSelected;
+    const [showDetails, setShowDetails] = useState(false);
+    const eta = formatETA(tele.distanceToNextStopM, tele.speedKmh);
 
     return (
         <div className="relative">
@@ -34,7 +45,7 @@ function BusCard({
             >
                 {/* Header Section */}
                 <div className="flex items-start gap-4 mb-3">
-                    {/* Large Bus Icon - Clean */}
+                    {/* Large Bus Icon */}
                     <Bus size={42} className="text-[var(--color-text)] shrink-0 mt-1" strokeWidth={1.5} />
 
                     <div className="flex-1 min-w-0">
@@ -42,19 +53,23 @@ function BusCard({
                             {tele.label}
                         </h3>
                         <p className="text-xs text-[var(--text-faint)] mt-1 font-light truncate">
-                            Lorem Ipsum is simply dummy text
+                            ถึง {tele.nextStopName}
                         </p>
+                    </div>
+
+                    {/* ETA Badge */}
+                    <div className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-primary/15 border border-primary/30">
+                        <Clock size={12} className="text-primary" />
+                        <span className="text-xs font-semibold text-primary whitespace-nowrap">{eta}</span>
                     </div>
                 </div>
 
                 {/* Progress Bar with Arrow Head */}
                 <div className="relative h-1.5 bg-surface-lighter rounded-full mb-4 mx-1 mt-4">
-                    {/* Custom shaped progress bar */}
                     <div
                         className="absolute top-0 left-0 h-full bg-gradient-to-r from-primary-dark to-primary flex items-center rounded-l-full transition-all duration-500 ease-out"
                         style={{ width: `${Math.max(5, tele.progressPercent)}%` }}
                     >
-                        {/* Arrow Head Tip */}
                         <div className="absolute right-[-6px] top-1/2 -translate-y-1/2 z-10 filter drop-shadow-[0_0_4px_rgba(254,80,80,0.6)]">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="white" className="transform rotate-0">
                                 <path d="M21 12l-18 12v-24z" />
@@ -63,7 +78,7 @@ function BusCard({
                     </div>
                 </div>
 
-                {/* Info Row - Simplified */}
+                {/* Info Row */}
                 <div className="flex items-center justify-between text-xs mb-2 px-1">
                     <div className="flex items-center gap-2">
                         <User size={14} className={isWarning ? "text-offline" : "text-fresh"} />
@@ -81,8 +96,8 @@ function BusCard({
                     </div>
                 </div>
 
-                {/* Timeline Section - Only show when expanded/selected */}
-                <div className={`transition-all duration-300 overflow-hidden ${showDetails ? "max-h-[200px] opacity-100 mt-4" : "max-h-0 opacity-0"}`}>
+                {/* Timeline Section - Only show when expanded */}
+                <div className={`transition-all duration-300 overflow-hidden ${showDetails ? "max-h-[250px] opacity-100 mt-4" : "max-h-0 opacity-0"}`}>
                     <div className="relative pl-3">
                         {/* Vertical Dotted Line */}
                         <div className="absolute left-[27px] top-4 bottom-4 w-0 border-l-2 border-dotted border-[var(--glass-border)]" />
@@ -104,13 +119,28 @@ function BusCard({
                                     <MapPin size={14} className="text-primary" />
                                 </div>
                             </div>
-                            <div className="flex-1 py-3 px-4 rounded-xl bg-surface-lighter/30 border border-[var(--glass-border)] shadow-sm">
+                            <div className="flex-1 py-3 px-4 rounded-xl bg-surface-lighter/30 border border-[var(--glass-border)] shadow-sm flex items-center justify-between">
                                 <span className="text-sm font-medium text-[var(--color-text)]">{tele.nextStopName}</span>
+                                <span className="text-[10px] font-medium text-primary bg-primary/10 px-2 py-0.5 rounded-full">{eta}</span>
                             </div>
                         </div>
                     </div>
                 </div>
             </button>
+
+            {/* Details Toggle Button */}
+            {isSelected && (
+                <div className="px-5 pb-3 -mt-1">
+                    <button
+                        onClick={(e) => { e.stopPropagation(); setShowDetails(!showDetails); }}
+                        className="w-full flex items-center justify-center gap-2 py-2 rounded-xl text-xs font-medium text-[var(--text-faint)] hover:text-[var(--color-text)] hover:bg-surface-lighter/30 transition-all border border-transparent hover:border-[var(--glass-border)]"
+                    >
+                        <Info size={13} />
+                        {showDetails ? "ซ่อนรายละเอียด" : "ดูรายละเอียด"}
+                    </button>
+                </div>
+            )}
+
             {/* Divider Line */}
             {!isSelected && <div className="mx-6 h-px bg-[var(--map-control-hover)]" />}
         </div>
@@ -202,4 +232,3 @@ export function VehiclePanel({ vehicles, telemetry, onSelectVehicle, selectedVeh
         </>
     );
 }
-
