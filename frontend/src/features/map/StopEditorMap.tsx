@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import maplibregl from "maplibre-gl";
 import campusConfig from "../../data/campus-config.json";
 import type { CircleLayerSpecification, SymbolLayerSpecification } from "maplibre-gl";
+import { useTheme } from "next-themes";
 
 import { loadMapIcons } from "./map-utils";
 import { getCampusViewport } from "./campus-viewport";
@@ -86,9 +87,17 @@ export function StopEditorMap({ isPlacing, stops, onMapClick, onStopMove }: Stop
     const containerRef = useRef<HTMLDivElement | null>(null);
     const [isMapReady, setIsMapReady] = useState(false);
     const draggingRef = useRef<number | null>(null);
+    const { resolvedTheme } = useTheme();
 
-    const isMobile = window.innerWidth < 768;
-    const { campusBounds, campusCenter } = getCampusViewport(campusConfig.polygon as [number, number][], { isMobile });
+    const isMobile = typeof window !== "undefined" ? window.innerWidth < 768 : false;
+    const { campusBounds, campusCenter } = useMemo(
+        () => getCampusViewport(campusConfig.polygon as [number, number][], { isMobile }),
+        [isMobile]
+    );
+    const styleUrl =
+        resolvedTheme === "light"
+            ? "https://tiles.openfreemap.org/styles/liberty"
+            : "https://tiles.openfreemap.org/styles/dark";
 
     const onMapClickRef = useRef(onMapClick);
     onMapClickRef.current = onMapClick;
@@ -100,8 +109,6 @@ export function StopEditorMap({ isPlacing, stops, onMapClick, onStopMove }: Stop
     useEffect(() => {
         if (!containerRef.current || mapRef.current) return;
 
-        // Using OpenFreeMap - free, no API key required
-        const styleUrl = "https://tiles.openfreemap.org/styles/liberty";
         const map = new maplibregl.Map({
             container: containerRef.current,
             style: styleUrl,
@@ -195,7 +202,7 @@ export function StopEditorMap({ isPlacing, stops, onMapClick, onStopMove }: Stop
             mapRef.current = null;
             setIsMapReady(false);
         };
-    }, []);
+    }, [campusBounds, campusCenter, styleUrl]);
 
     // Update cursor when placing mode changes
     useEffect(() => {

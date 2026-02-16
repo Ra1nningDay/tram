@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import maplibregl from "maplibre-gl";
 import type { LineLayerSpecification, CircleLayerSpecification, FillLayerSpecification } from "maplibre-gl";
+import { useTheme } from "next-themes";
 import campusConfig from "../../data/campus-config.json";
 import { getCampusViewport } from "./campus-viewport";
 
@@ -67,9 +68,17 @@ export function DrawingEditorMap({ mode, isDrawing, points, onMapClick, onPointM
     const containerRef = useRef<HTMLDivElement | null>(null);
     const [isMapReady, setIsMapReady] = useState(false);
     const draggingPointRef = useRef<number | null>(null);
+    const { resolvedTheme } = useTheme();
 
-    const isMobile = window.innerWidth < 768;
-    const { campusBounds, campusCenter } = getCampusViewport(campusConfig.polygon as [number, number][], { isMobile });
+    const isMobile = typeof window !== "undefined" ? window.innerWidth < 768 : false;
+    const { campusBounds, campusCenter } = useMemo(
+        () => getCampusViewport(campusConfig.polygon as [number, number][], { isMobile }),
+        [isMobile]
+    );
+    const styleUrl =
+        resolvedTheme === "light"
+            ? "https://tiles.openfreemap.org/styles/liberty"
+            : "https://tiles.openfreemap.org/styles/dark";
 
     const onMapClickRef = useRef(onMapClick);
     const onPointMoveRef = useRef(onPointMove);
@@ -86,8 +95,6 @@ export function DrawingEditorMap({ mode, isDrawing, points, onMapClick, onPointM
     useEffect(() => {
         if (!containerRef.current || mapRef.current) return;
 
-        // Using OpenFreeMap - free, no API key required
-        const styleUrl = "https://tiles.openfreemap.org/styles/liberty";
         const map = new maplibregl.Map({
             container: containerRef.current,
             style: styleUrl,
@@ -208,7 +215,7 @@ export function DrawingEditorMap({ mode, isDrawing, points, onMapClick, onPointM
             mapRef.current = null;
             setIsMapReady(false);
         };
-    }, []);
+    }, [campusBounds, campusCenter, styleUrl]);
 
     useEffect(() => {
         const map = mapRef.current;

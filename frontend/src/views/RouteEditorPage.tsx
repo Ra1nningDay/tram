@@ -4,6 +4,7 @@ import { DrawingEditorMap } from "../features/map/DrawingEditorMap";
 import { StopEditorControls, useStopEditor } from "../components/StopEditor";
 import { StopEditorMap } from "../features/map/StopEditorMap";
 import { Route, MapPin, Pentagon, Check } from "lucide-react";
+import { ThemeToggle } from "../components/ThemeToggle";
 import shuttleData from "../data/shuttle-data.json";
 import campusConfig from "../data/campus-config.json";
 
@@ -181,8 +182,8 @@ export function RouteEditorPage() {
           showToast ? "translate-y-0 opacity-100" : "-translate-y-4 opacity-0"
         }`}
       >
-        <div className="flex items-center gap-2 rounded-lg bg-slate-800 px-4 py-2 text-white shadow-lg">
-          <Check className="h-4 w-4 text-green-400" />
+        <div className="glass-card-dark flex items-center gap-2 rounded-lg px-4 py-2 shadow-lg">
+          <Check className="h-4 w-4 text-fresh" />
           <span className="text-sm font-medium">{toastMessage}</span>
         </div>
       </div>
@@ -212,7 +213,9 @@ export function RouteEditorPage() {
           <button
             onClick={() => handleTabChange("route")}
             className={`flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
-              activeTab === "route" ? "bg-red-500 text-white" : "text-slate-600 hover:bg-slate-100"
+              activeTab === "route"
+                ? "bg-red-500 text-white"
+                : "text-[var(--color-text)] hover:bg-[var(--color-surface-lighter)]"
             }`}
           >
             <Route className="h-4 w-4" />
@@ -221,7 +224,9 @@ export function RouteEditorPage() {
           <button
             onClick={() => handleTabChange("stops")}
             className={`flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
-              activeTab === "stops" ? "bg-blue-500 text-white" : "text-slate-600 hover:bg-slate-100"
+              activeTab === "stops"
+                ? "bg-blue-500 text-white"
+                : "text-[var(--color-text)] hover:bg-[var(--color-surface-lighter)]"
             }`}
           >
             <MapPin className="h-4 w-4" />
@@ -230,7 +235,9 @@ export function RouteEditorPage() {
           <button
             onClick={() => handleTabChange("mask")}
             className={`flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
-              activeTab === "mask" ? "bg-purple-500 text-white" : "text-slate-600 hover:bg-slate-100"
+              activeTab === "mask"
+                ? "bg-purple-500 text-white"
+                : "text-[var(--color-text)] hover:bg-[var(--color-surface-lighter)]"
             }`}
           >
             <Pentagon className="h-4 w-4" />
@@ -238,6 +245,8 @@ export function RouteEditorPage() {
           </button>
         </div>
       </div>
+
+      <ThemeToggle className="absolute right-4 top-20 z-20 md:right-[272px] md:top-4" />
 
       <div className="absolute right-4 top-4 z-10">
         {activeTab === "stops" ? (
@@ -266,7 +275,7 @@ export function RouteEditorPage() {
       </div>
 
       <div className="glass-card absolute bottom-4 left-1/2 z-10 -translate-x-1/2 px-4 py-2">
-        <p className="text-sm text-slate-600">
+        <p className="text-sm text-[var(--color-text-muted)]">
           {activeTab === "stops"
             ? stopEditor.isPlacing
               ? "Click map to place stops"

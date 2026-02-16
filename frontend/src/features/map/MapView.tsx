@@ -1,13 +1,15 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { Scan, Plus, Minus } from "lucide-react";
 import maplibregl from "maplibre-gl";
+import { useTheme } from "next-themes";
 import { routeLayer, stopsLayer, vehiclesLayer } from "./layers";
 import { routeToGeoJson, stopsToGeoJson, vehiclesToGeoJson } from "./sources";
 import { loadMapIcons, loadVehicleIcon } from "./map-utils";
 import { getCampusViewport } from "./campus-viewport";
+import { ThemeToggle } from "../../components/ThemeToggle";
 
 import type { Route, Stop, Vehicle } from "../shuttle/api";
-import type { FillLayerSpecification, LineLayerSpecification } from "maplibre-gl";
+import type { LineLayerSpecification } from "maplibre-gl";
 import campusConfig from "../../data/campus-config.json";
 
 type MapViewProps = {
@@ -59,10 +61,19 @@ export function MapView({ route, stops, vehicles, onSelectStop, onSelectVehicle,
   const mapRef = useRef<maplibregl.Map | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapLoadedRef = useRef(false);
+  const { resolvedTheme } = useTheme();
 
-  const isMobile = window.innerWidth < 768;
+  const isMobile = typeof window !== "undefined" ? window.innerWidth < 768 : false;
+  const mapTheme = resolvedTheme === "light" ? "light" : "dark";
+  const styleUrl =
+    mapTheme === "dark"
+      ? "https://tiles.openfreemap.org/styles/dark"
+      : "https://tiles.openfreemap.org/styles/liberty";
 
-  const { campusCenter } = getCampusViewport(CAMPUS_POLYGON, { isMobile });
+  const { campusCenter } = useMemo(
+    () => getCampusViewport(CAMPUS_POLYGON, { isMobile }),
+    [isMobile]
+  );
 
   // Stable callback refs
   const onSelectStopRef = useRef(onSelectStop);
@@ -75,9 +86,6 @@ export function MapView({ route, stops, vehicles, onSelectStop, onSelectVehicle,
   // Initialize map ONCE
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
-
-    // Using OpenFreeMap dark style - free, no API key required
-    const styleUrl = "https://tiles.openfreemap.org/styles/dark";
 
     const initialBearing = isMobile ? (campusConfig.initialBearing ?? 0) : 0;
 
@@ -109,6 +117,10 @@ export function MapView({ route, stops, vehicles, onSelectStop, onSelectVehicle,
       map.addLayer(vehiclesLayer);
 
       loadMapIcons(map);
+
+      // Hide default one-way arrows from the style
+      if (map.getLayer("road_oneway")) map.setLayoutProperty("road_oneway", "visibility", "none");
+      if (map.getLayer("road_oneway_opposite")) map.setLayoutProperty("road_oneway_opposite", "visibility", "none");
       loadVehicleIcon(map);
 
       map.on("click", "stops", (event) => {
@@ -134,7 +146,7 @@ export function MapView({ route, stops, vehicles, onSelectStop, onSelectVehicle,
       mapRef.current = null;
       mapLoadedRef.current = false;
     };
-  }, []);
+  }, [campusCenter, isMobile, mapTheme, styleUrl]);
 
   // Update route source
   useEffect(() => {
@@ -225,24 +237,33 @@ export function MapView({ route, stops, vehicles, onSelectStop, onSelectVehicle,
 
       {/* Custom Navigation Controls (Mobile: Top-Right, Desktop: Bottom-Left) */}
       <div className="absolute top-5 right-4 md:top-auto md:right-auto md:bottom-6 md:left-4 z-10 flex flex-col gap-2">
-        <div className="flex flex-col rounded-lg shadow-lg overflow-hidden border border-white/10" style={{ background: 'rgba(41,45,50,0.9)' }}>
+        <ThemeToggle menuAlign={isMobile ? "right" : "left"} />
+        <div
+          className="flex flex-col overflow-hidden rounded-lg border shadow-lg"
+          style={{
+            background: "var(--map-control-bg)",
+            borderColor: "var(--map-control-border)",
+          }}
+        >
           <button
             onClick={handleFitBounds}
-            className="p-2 hover:bg-white/10 focus:outline-none text-muted border-b border-white/10"
+            className="border-b p-2 text-[var(--color-text)] focus:outline-none hover:bg-[var(--map-control-hover)]"
+            style={{ borderColor: "var(--map-control-border)" }}
             title="Fit to Campus"
           >
             <Scan size={20} />
           </button>
           <button
             onClick={handleZoomIn}
-            className="p-2 hover:bg-white/10 focus:outline-none text-muted border-b border-white/10"
+            className="border-b p-2 text-[var(--color-text)] focus:outline-none hover:bg-[var(--map-control-hover)]"
+            style={{ borderColor: "var(--map-control-border)" }}
             title="Zoom In"
           >
             <Plus size={20} />
           </button>
           <button
             onClick={handleZoomOut}
-            className="p-2 hover:bg-white/10 focus:outline-none text-muted"
+            className="p-2 text-[var(--color-text)] focus:outline-none hover:bg-[var(--map-control-hover)]"
             title="Zoom Out"
           >
             <Minus size={20} />
