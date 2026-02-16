@@ -2,7 +2,6 @@ import maplibregl from "maplibre-gl";
 import { renderToStaticMarkup } from "react-dom/server";
 import { AVAILABLE_ICONS } from "../../lib/icons";
 import React from "react"; // Needed for React.createElement
-
 import { Bus } from "lucide-react";
 
 const MAP_COLORS = {
@@ -63,45 +62,71 @@ function generateIcon(
     };
 }
 
-export function loadVehicleIcon(map: maplibregl.Map) {
-    // Used by the vehicles layer to keep the icon upright (never upside down):
-    // it swaps between the normal and horizontally-mirrored images based on heading.
-    if (map.hasImage("Vehicle") && map.hasImage("VehicleFlipped")) return;
+/**
+ * Vehicle icons: Lucide Bus inside colored circles per status.
+ * - Vehicle-fresh  → green circle
+ * - Vehicle-delayed → orange circle
+ * - Vehicle-offline → red circle
+ * - Vehicle         → default (green)
+ *
+ * No rotation / no flip — icon stays upright; direction is shown by movement.
+ * Status only changes when vehicle starts/stops dwelling, so icon_image
+ * switches very rarely → no flicker.
+ */
+const VEHICLE_STATUS_COLORS: Record<string, string> = {
+    fresh: "#16a34a",   // Green-600
+    delayed: "#ea580c", // Orange-600
+    offline: "#dc2626", // Red-600
+};
 
-    const rawSvg = renderToStaticMarkup(
+export function loadVehicleIcon(map: maplibregl.Map) {
+    const busSvg = renderToStaticMarkup(
         React.createElement(Bus, {
-            size: 40,
+            size: 36,
             color: "#ffffff",
             strokeWidth: 2.5,
-            fill: "#ffffff",
-            fillOpacity: 0.3,
         })
     );
 
-    // Extract inner SVG markup so we can wrap it with transforms (mirror) cleanly.
-    const inner = rawSvg
-        .replace(/^<svg[^>]*>/, "")
-        .replace(/<\/svg>\s*$/, "");
+    for (const [status, color] of Object.entries(VEHICLE_STATUS_COLORS)) {
+        const imageName = `Vehicle-${status}`;
+        if (map.hasImage(imageName)) continue;
 
-    const buildMarkerSvg = (flipped: boolean) => {
-        const g = flipped ? `<g transform="translate(40, 0) scale(-1, 1)">${inner}</g>` : `<g>${inner}</g>`;
-        return `
-        <svg width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg">
-            ${g}
+        const markerSvg = `
+        <svg width="80" height="80" viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="40" cy="40" r="36" fill="${color}" stroke="white" stroke-width="4"/>
+            <g transform="translate(22, 22)">
+                ${busSvg}
+            </g>
         </svg>
         `.trim();
-    };
 
-    const add = (name: string, svg: string) => {
-        const image = new Image(40, 40);
-        image.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg);
+        const image = new Image(80, 80);
+        image.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(markerSvg);
         image.onload = () => {
-            if (!map.hasImage(name)) {
-                map.addImage(name, image, { sdf: true });
+            if (!map.hasImage(imageName)) {
+                map.addImage(imageName, image, { pixelRatio: 2 });
             }
         };
-    };
+    }
 
-    if (!map.hasImage("Vehicle")) add("Vehicle", buildMarkerSvg(false));
-    if (!map.hasImage("VehicleFlipped")) add("VehicleFlipped", buildMarkerSvg(true));
+    // Default "Vehicle" alias → same as fresh
+    if (!map.hasImage("Vehicle")) {
+        const markerSvg = `
+        <svg width="80" height="80" viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="40" cy="40" r="36" fill="${VEHICLE_STATUS_COLORS.fresh}" stroke="white" stroke-width="4"/>
+            <g transform="translate(22, 22)">
+                ${busSvg}
+            </g>
+        </svg>
+        `.trim();
+
+        const image = new Image(80, 80);
+        image.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(markerSvg);
+        image.onload = () => {
+            if (!map.hasImage("Vehicle")) {
+                map.addImage("Vehicle", image, { pixelRatio: 2 });
+            }
+        };
+    }
 }

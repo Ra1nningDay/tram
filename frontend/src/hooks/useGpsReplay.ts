@@ -251,22 +251,16 @@ function advanceCursorMut(cursor: TramCursor, realDeltaMs: number): {
 /* ------------------------------------------------------------------ */
 
 function buildVehicleFeature(
-    id: string, label: string, lng: number, lat: number, heading: number, bearing: number = 0
+    id: string, label: string, lng: number, lat: number, heading: number, _bearing: number = 0
 ) {
     const rawHeading = ((heading % 360) + 360) % 360;
-
-    // Calculate heading relative to screen "Up"
-    const screenHeading = ((rawHeading - bearing) % 360 + 360) % 360;
-
-    // Flip if moving "Left" on screen (180 to 360 degrees)
-    const flip = screenHeading > 180 && screenHeading < 360;
 
     return {
         type: "Feature" as const,
         geometry: { type: "Point" as const, coordinates: [lng, lat] },
         properties: {
-            icon_image: flip ? "VehicleFlipped" : "Vehicle",
-            icon_rotate: 0, // No vertical rotation
+            icon_image: "Vehicle",
+            icon_rotate: 0,
             id,
             label,
             direction: "outbound",

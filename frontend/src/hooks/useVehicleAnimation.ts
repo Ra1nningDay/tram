@@ -288,13 +288,26 @@ export function useVehicleAnimation(options: UseVehicleAnimationOptions = {}) {
                 speed = 0;
                 // Keep the snapped stop position while dwelling (do not drift/tilt).
 
-                // Finished dwelling
+                // Finished dwelling – nudge progress past this stop anchor so it
+                // won't be re-detected on the very next tick (which causes the
+                // "flicker and stuck in place" bug).
                 if (dwellTime <= 0) {
                     status = "fresh";
                     speed = baseSpeed;
+
+                    const NUDGE = 1e-6;
+                    const nextIdx = getNextIndex(routeIndex);
+                    const segLen = Math.max(getDistance(coords[routeIndex], coords[nextIdx]), 1e-9);
+                    progress += NUDGE / segLen;
+
+                    // If the nudge pushes us past the segment end, move to the next segment.
+                    if (progress >= 1) {
+                        routeIndex = nextIdx;
+                        progress = 0;
+                    }
                 }
 
-                return { ...vehicle, dwellTime, status, speed, position };
+                return { ...vehicle, routeIndex, progress, dwellTime, status, speed, position };
             }
 
             // Normal movement

@@ -29,17 +29,37 @@ export function MapPage() {
   const mapRef = useRef<maplibregl.Map | null>(null);
 
   const handleMapReady = useCallback(
-    (map: maplibregl.Map) => {
+    (map?: maplibregl.Map) => {
+      if (!map) {
+        mapRef.current = null;
+        setMapUpdater(null);
+        return;
+      }
+
       mapRef.current = map;
       setMapUpdater((geojson) => {
-        const source = map.getSource("vehicles") as maplibregl.GeoJSONSource | undefined;
-        if (source) {
-          source.setData(geojson as GeoJSON.GeoJSON);
+        const currentMap = mapRef.current;
+        if (!currentMap || typeof currentMap.getSource !== "function") return;
+
+        try {
+          const source = currentMap.getSource("vehicles") as maplibregl.GeoJSONSource | undefined;
+          if (source) {
+            source.setData(geojson as GeoJSON.GeoJSON);
+          }
+        } catch {
+          // The map can be torn down/recreated during theme switches; skip this frame safely.
         }
       });
     },
     [setMapUpdater]
   );
+
+  useEffect(() => {
+    return () => {
+      mapRef.current = null;
+      setMapUpdater(null);
+    };
+  }, [setMapUpdater]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -80,8 +100,11 @@ export function MapPage() {
       <Header />
 
       {loading && (
-        <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-          <div className="rounded-2xl px-8 py-6 shadow-xl" style={{ background: "rgba(41,45,50,0.95)" }}>
+        <div
+          className="absolute inset-0 z-50 flex items-center justify-center backdrop-blur-sm"
+          style={{ background: "var(--overlay)" }}
+        >
+          <div className="glass-card-dark rounded-2xl px-8 py-6 shadow-xl">
             <div className="flex items-center gap-3">
               <div className="h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent" />
               <span className="text-sm font-medium text-muted">Loading GPS data...</span>

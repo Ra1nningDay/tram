@@ -29,30 +29,19 @@ export const vehiclesLayer: SymbolLayerSpecification = {
   type: "symbol",
   source: "vehicles",
   layout: {
-    // Use precomputed properties from `vehiclesToGeoJson` to avoid complex expressions.
-    "icon-image": ["coalesce", ["get", "icon_image"], "Vehicle"],
+    // Select Bus icon color based on vehicle status
+    "icon-image": [
+      "match", ["get", "status"],
+      "fresh", "Vehicle-fresh",
+      "delayed", "Vehicle-delayed",
+      "offline", "Vehicle-offline",
+      "Vehicle"
+    ],
     // Scale vehicle icon with zoom so it's readable when zoomed in, but not huge when zoomed out.
     "icon-size": ["interpolate", ["linear"], ["zoom"], 13, 0.7, 15, 0.9, 17, 1.15, 19, 1.5, 21, 1.9],
     "icon-allow-overlap": true,
-    "icon-keep-upright": true,
-    "icon-rotate": 0, // icon-rotate is managed by source (always 0 now, just flipping)
     "icon-rotation-alignment": "viewport",
     "icon-ignore-placement": true,
   },
-  paint: {
-    "icon-color": [
-      "match",
-      ["get", "status"],
-      "fresh",
-      "#16a34a", // Green-600 (Darker for better contrast)
-      "delayed",
-      "#ea580c", // Orange-600
-      "offline",
-      "#dc2626", // Red-600
-      "#64748b", // Slate-500
-    ],
-    "icon-halo-color": "#ffffff",
-    "icon-halo-width": 2,
-    "icon-halo-blur": 0.5,
-  },
+  paint: {},
 };
