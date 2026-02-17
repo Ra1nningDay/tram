@@ -99,7 +99,7 @@ export function MapView({ route, stops, vehicles, onSelectStop, onSelectVehicle,
       bearing: initialBearing,
     });
 
-    map.on("load", () => {
+    map.on("load", async () => {
       // Add campus boundary outline
       map.addSource("campus-boundary", {
         type: "geojson",
@@ -116,12 +116,12 @@ export function MapView({ route, stops, vehicles, onSelectStop, onSelectVehicle,
       map.addLayer(stopsLayer);
       map.addLayer(vehiclesLayer);
 
-      loadMapIcons(map);
+      // Wait for all icons to load before marking map as ready
+      await Promise.all([loadMapIcons(map), loadVehicleIcon(map)]);
 
       // Hide default one-way arrows from the style
       if (map.getLayer("road_oneway")) map.setLayoutProperty("road_oneway", "visibility", "none");
       if (map.getLayer("road_oneway_opposite")) map.setLayoutProperty("road_oneway_opposite", "visibility", "none");
-      loadVehicleIcon(map);
 
       map.on("click", "stops", (event) => {
         const feature = event.features?.[0];

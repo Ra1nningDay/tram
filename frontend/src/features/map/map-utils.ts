@@ -13,27 +13,46 @@ const MAP_COLORS = {
     teal: "#14b8a6",
 };
 
-export function loadMapIcons(map: maplibregl.Map) {
-    AVAILABLE_ICONS.forEach((icon) => {
-        // Generate default (blue) icon usage: "IconName"
-        generateIcon(map, icon.name, icon.component, MAP_COLORS.blue);
+/**
+ * Loads an SVG string as a MapLibre image.
+ * Returns a Promise that resolves when the image is added to the map.
+ */
+function addSvgImage(
+    map: maplibregl.Map,
+    imageName: string,
+    svgMarkup: string,
+    size: number,
+    options?: Partial<Parameters<maplibregl.Map["addImage"]>[2]>
+): Promise<void> {
+    if (map.hasImage(imageName)) return Promise.resolve();
 
-        // Generate colored variants: "IconName-color"
-        Object.entries(MAP_COLORS).forEach(([colorName, hex]) => {
-            generateIcon(map, `${icon.name}-${colorName}`, icon.component, hex);
-        });
+    return new Promise<void>((resolve) => {
+        const image = new Image(size, size);
+        image.onload = () => {
+            if (!map.hasImage(imageName)) {
+                map.addImage(imageName, image, options ?? {});
+            }
+            resolve();
+        };
+        image.onerror = () => {
+            console.warn(`[map-utils] Failed to load icon: ${imageName}`);
+            resolve(); // Don't block other icons
+        };
+        image.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svgMarkup);
     });
 }
 
+/**
+ * Generate a Lucide icon inside a colored circle and add it to the map.
+ */
 function generateIcon(
     map: maplibregl.Map,
     imageName: string,
     IconComponent: React.ElementType,
     colorHex: string
-) {
-    if (map.hasImage(imageName)) return;
+): Promise<void> {
+    if (map.hasImage(imageName)) return Promise.resolve();
 
-    // Render icon to SVG string
     const svgString = renderToStaticMarkup(
         React.createElement(IconComponent, {
             size: 40,
@@ -42,7 +61,6 @@ function generateIcon(
         })
     );
 
-    // Wrap in a colored circle pin
     const markerSvg = `
     <svg width="80" height="80" viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg">
         <circle cx="40" cy="40" r="36" fill="${colorHex}" stroke="white" stroke-width="4"/>
@@ -52,26 +70,32 @@ function generateIcon(
     </svg>
     `.trim();
 
-    // Convert to image
-    const image = new Image(80, 80);
-    image.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(markerSvg);
-    image.onload = () => {
-        if (!map.hasImage(imageName)) {
-            map.addImage(imageName, image, { pixelRatio: 2 });
-        }
-    };
+    return addSvgImage(map, imageName, markerSvg, 80, { pixelRatio: 2 });
+}
+
+/**
+ * Load all stop/POI icons. Returns a Promise that resolves when ALL icons are loaded.
+ * This ensures icons are ready before MapLibre tries to render features.
+ */
+export async function loadMapIcons(map: maplibregl.Map): Promise<void> {
+    const promises: Promise<void>[] = [];
+
+    AVAILABLE_ICONS.forEach((icon) => {
+        // Generate default (blue) icon
+        promises.push(generateIcon(map, icon.name, icon.component, MAP_COLORS.blue));
+
+        // Generate colored variants: "IconName-color"
+        Object.entries(MAP_COLORS).forEach(([colorName, hex]) => {
+            promises.push(generateIcon(map, `${icon.name}-${colorName}`, icon.component, hex));
+        });
+    });
+
+    await Promise.all(promises);
 }
 
 /**
  * Vehicle icons: Lucide Bus inside colored circles per status.
- * - Vehicle-fresh  → green circle
- * - Vehicle-delayed → orange circle
- * - Vehicle-offline → red circle
- * - Vehicle         → default (green)
- *
- * No rotation / no flip — icon stays upright; direction is shown by movement.
- * Status only changes when vehicle starts/stops dwelling, so icon_image
- * switches very rarely → no flicker.
+ * Returns a Promise that resolves when all vehicle icons are loaded.
  */
 const VEHICLE_STATUS_COLORS: Record<string, string> = {
     fresh: "#16a34a",   // Green-600
@@ -79,7 +103,7 @@ const VEHICLE_STATUS_COLORS: Record<string, string> = {
     offline: "#dc2626", // Red-600
 };
 
-export function loadVehicleIcon(map: maplibregl.Map) {
+export async function loadVehicleIcon(map: maplibregl.Map): Promise<void> {
     const busSvg = renderToStaticMarkup(
         React.createElement(Bus, {
             size: 36,
@@ -88,10 +112,10 @@ export function loadVehicleIcon(map: maplibregl.Map) {
         })
     );
 
+    const promises: Promise<void>[] = [];
+
     for (const [status, color] of Object.entries(VEHICLE_STATUS_COLORS)) {
         const imageName = `Vehicle-${status}`;
-        if (map.hasImage(imageName)) continue;
-
         const markerSvg = `
         <svg width="80" height="80" viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg">
             <circle cx="40" cy="40" r="36" fill="${color}" stroke="white" stroke-width="4"/>
@@ -101,32 +125,20 @@ export function loadVehicleIcon(map: maplibregl.Map) {
         </svg>
         `.trim();
 
-        const image = new Image(80, 80);
-        image.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(markerSvg);
-        image.onload = () => {
-            if (!map.hasImage(imageName)) {
-                map.addImage(imageName, image, { pixelRatio: 2 });
-            }
-        };
+        promises.push(addSvgImage(map, imageName, markerSvg, 80, { pixelRatio: 2 }));
     }
 
     // Default "Vehicle" alias → same as fresh
-    if (!map.hasImage("Vehicle")) {
-        const markerSvg = `
-        <svg width="80" height="80" viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <circle cx="40" cy="40" r="36" fill="${VEHICLE_STATUS_COLORS.fresh}" stroke="white" stroke-width="4"/>
-            <g transform="translate(22, 22)">
-                ${busSvg}
-            </g>
-        </svg>
-        `.trim();
+    const defaultSvg = `
+    <svg width="80" height="80" viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="40" cy="40" r="36" fill="${VEHICLE_STATUS_COLORS.fresh}" stroke="white" stroke-width="4"/>
+        <g transform="translate(22, 22)">
+            ${busSvg}
+        </g>
+    </svg>
+    `.trim();
 
-        const image = new Image(80, 80);
-        image.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(markerSvg);
-        image.onload = () => {
-            if (!map.hasImage("Vehicle")) {
-                map.addImage("Vehicle", image, { pixelRatio: 2 });
-            }
-        };
-    }
+    promises.push(addSvgImage(map, "Vehicle", defaultSvg, 80, { pixelRatio: 2 }));
+
+    await Promise.all(promises);
 }
