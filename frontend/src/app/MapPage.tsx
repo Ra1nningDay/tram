@@ -27,6 +27,8 @@ export function MapPage() {
 
   const [selectedVehicleId, setSelectedVehicleId] = useState<string | null>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
+  const selectedVehicleIdRef = useRef<string | null>(null);
+  selectedVehicleIdRef.current = selectedVehicleId;
 
   const handleMapReady = useCallback(
     (map?: maplibregl.Map) => {
@@ -40,6 +42,17 @@ export function MapPage() {
       setMapUpdater((geojson) => {
         const currentMap = mapRef.current;
         if (!currentMap || typeof currentMap.getSource !== "function") return;
+
+        // Mark the selected vehicle so the layer renders a gold icon
+        const selectedId = selectedVehicleIdRef.current;
+        if (selectedId && geojson && "features" in geojson) {
+          const fc = geojson as GeoJSON.FeatureCollection;
+          for (const f of fc.features) {
+            if (f.properties?.id === selectedId) {
+              f.properties.status = "selected";
+            }
+          }
+        }
 
         try {
           const source = currentMap.getSource("vehicles") as maplibregl.GeoJSONSource | undefined;
@@ -91,7 +104,7 @@ export function MapPage() {
           route={routeData?.route}
           stops={stopsData?.stops}
           vehicles={vehicles}
-          onSelectStop={() => {}}
+          onSelectStop={() => { }}
           onSelectVehicle={handleSelectVehicle}
           onMapReady={handleMapReady}
         />

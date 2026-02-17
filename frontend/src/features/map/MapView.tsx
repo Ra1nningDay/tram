@@ -3,7 +3,7 @@ import { Scan, Plus, Minus } from "lucide-react";
 import maplibregl from "maplibre-gl";
 import { useTheme } from "next-themes";
 import { routeLayer, stopsLayer, vehiclesLayer } from "./layers";
-import { routeToGeoJson, stopsToGeoJson, vehiclesToGeoJson } from "./sources";
+import { routeToGeoJson, stopsToGeoJson } from "./sources";
 import { loadMapIcons, loadVehicleIcon } from "./map-utils";
 import { getCampusViewport } from "./campus-viewport";
 import { ThemeToggle } from "../../components/ThemeToggle";
@@ -170,18 +170,12 @@ export function MapView({ route, stops, vehicles, onSelectStop, onSelectVehicle,
     }
   }, [stops]);
 
-  // Update vehicles source
+  // Vehicle rendering is handled by the animation callback (setMapUpdater in MapPage).
+  // We only need to ensure vehicle icons are loaded after HMR.
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !mapLoadedRef.current) return;
-
-    // Fast Refresh can preserve the Map instance; ensure vehicle icons are present even after HMR.
     loadVehicleIcon(map);
-
-    const source = map.getSource("vehicles") as maplibregl.GeoJSONSource | undefined;
-    if (source) {
-      source.setData(vehiclesToGeoJson(vehicles) ?? { type: "FeatureCollection", features: [] });
-    }
   }, [vehicles]);
 
   // Initial data load
@@ -192,16 +186,12 @@ export function MapView({ route, stops, vehicles, onSelectStop, onSelectVehicle,
     const handleLoad = () => {
       const routeSource = map.getSource("route") as maplibregl.GeoJSONSource | undefined;
       const stopsSource = map.getSource("stops") as maplibregl.GeoJSONSource | undefined;
-      const vehiclesSource = map.getSource("vehicles") as maplibregl.GeoJSONSource | undefined;
 
       if (routeSource && route) {
         routeSource.setData(routeToGeoJson(route) ?? { type: "FeatureCollection", features: [] });
       }
       if (stopsSource && stops) {
         stopsSource.setData(stopsToGeoJson(stops) ?? { type: "FeatureCollection", features: [] });
-      }
-      if (vehiclesSource && vehicles) {
-        vehiclesSource.setData(vehiclesToGeoJson(vehicles) ?? { type: "FeatureCollection", features: [] });
       }
     };
 
@@ -210,7 +200,7 @@ export function MapView({ route, stops, vehicles, onSelectStop, onSelectVehicle,
     } else {
       map.on("load", handleLoad);
     }
-  }, [route, stops, vehicles]);
+  }, [route, stops]);
 
   const handleFitBounds = () => {
     const map = mapRef.current;

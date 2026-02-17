@@ -37,13 +37,14 @@ export function stopsToGeoJson(stops?: Stop[]): FeatureCollection<Point> | null 
   };
 }
 
-export function vehiclesToGeoJson(vehicles?: Vehicle[]): FeatureCollection<Point> | null {
+export function vehiclesToGeoJson(vehicles?: Vehicle[], selectedVehicleId?: string | null): FeatureCollection<Point> | null {
   if (!vehicles) return null;
   return {
     type: "FeatureCollection",
     features: vehicles.map((vehicle): Feature<Point> => {
       const rawHeading = typeof vehicle.heading === "number" ? vehicle.heading : 0;
       const heading = ((rawHeading % 360) + 360) % 360;
+      const isSelected = vehicle.id === selectedVehicleId;
 
       return {
         type: "Feature",
@@ -57,7 +58,7 @@ export function vehiclesToGeoJson(vehicles?: Vehicle[]): FeatureCollection<Point
           id: vehicle.id,
           label: vehicle.label ?? "",
           direction: vehicle.direction,
-          status: vehicle.status,
+          status: isSelected ? "selected" : vehicle.status,
           last_updated: vehicle.last_updated,
           heading,
         },

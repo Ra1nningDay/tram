@@ -35,10 +35,18 @@ export const vehiclesLayer: SymbolLayerSpecification = {
       "fresh", "Vehicle-fresh",
       "delayed", "Vehicle-delayed",
       "offline", "Vehicle-offline",
+      "selected", "Vehicle-selected",
       "Vehicle"
     ],
-    // Scale vehicle icon with zoom so it's readable when zoomed in, but not huge when zoomed out.
-    "icon-size": ["interpolate", ["linear"], ["zoom"], 13, 0.7, 15, 0.9, 17, 1.15, 19, 1.5, 21, 1.9],
+    // Selected vehicle is bigger to stand out
+    "icon-size": [
+      "interpolate", ["linear"], ["zoom"],
+      13, ["match", ["get", "status"], "selected", 0.95, 0.7],
+      15, ["match", ["get", "status"], "selected", 1.15, 0.9],
+      17, ["match", ["get", "status"], "selected", 1.4, 1.15],
+      19, ["match", ["get", "status"], "selected", 1.75, 1.5],
+      21, ["match", ["get", "status"], "selected", 2.15, 1.9],
+    ],
     "icon-allow-overlap": true,
     "icon-rotation-alignment": "viewport",
     "icon-ignore-placement": true,

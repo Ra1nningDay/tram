@@ -1,21 +1,18 @@
 import { useQuery } from "@tanstack/react-query";
-import { api } from "./api";
-import { mockRoute, mockStops, mockVehicles, getMockEtasForStop } from "./mock-data";
+import type { Route, Stop, Vehicle, Eta } from "./api";
 
 const REFRESH_MS = 3000;
-// Use mock data in development OR if explicitly enabled via NEXT_PUBLIC_USE_MOCK.
-const USE_MOCK =
-  process.env.NODE_ENV === "development" || process.env.NEXT_PUBLIC_USE_MOCK === "true";
+
+async function request<T>(path: string): Promise<T> {
+  const res = await fetch(path);
+  if (!res.ok) throw new Error(`Request failed: ${res.status}`);
+  return (await res.json()) as T;
+}
 
 export function useRoute() {
   return useQuery({
     queryKey: ["route"],
-    queryFn: async () => {
-      if (USE_MOCK) {
-        return { server_time: new Date().toISOString(), route: mockRoute };
-      }
-      return api.getRoute();
-    },
+    queryFn: () => request<{ server_time: string; route: Route }>("/api/route"),
     staleTime: Infinity,
   });
 }
@@ -23,12 +20,7 @@ export function useRoute() {
 export function useStops() {
   return useQuery({
     queryKey: ["stops"],
-    queryFn: async () => {
-      if (USE_MOCK) {
-        return { server_time: new Date().toISOString(), stops: mockStops };
-      }
-      return api.getStops();
-    },
+    queryFn: () => request<{ server_time: string; stops: Stop[] }>("/api/stops"),
     staleTime: Infinity,
   });
 }
@@ -36,13 +28,7 @@ export function useStops() {
 export function useVehicles() {
   return useQuery({
     queryKey: ["vehicles"],
-    queryFn: async () => {
-      if (USE_MOCK) {
-        // Return static mock vehicles (no randomization to prevent flickering)
-        return { server_time: new Date().toISOString(), vehicles: mockVehicles };
-      }
-      return api.getVehicles();
-    },
+    queryFn: () => request<{ server_time: string; vehicles: Vehicle[] }>("/api/vehicles"),
     staleTime: 0,
     refetchInterval: REFRESH_MS,
     refetchIntervalInBackground: false,
@@ -54,16 +40,10 @@ export function useVehicles() {
 export function useStopEtas(stopId?: string) {
   return useQuery({
     queryKey: ["etas", stopId],
-    queryFn: async () => {
-      if (USE_MOCK && stopId) {
-        return {
-          server_time: new Date().toISOString(),
-          stop_id: stopId,
-          etas: getMockEtasForStop(stopId),
-        };
-      }
-      return api.getStopEtas(stopId ?? "");
-    },
+    queryFn: () =>
+      request<{ server_time: string; stop_id: string; etas: Eta[] }>(
+        `/api/stops/${stopId}/etas`
+      ),
     enabled: Boolean(stopId),
     staleTime: 0,
     refetchInterval: REFRESH_MS,

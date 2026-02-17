@@ -101,6 +101,7 @@ const VEHICLE_STATUS_COLORS: Record<string, string> = {
     fresh: "#16a34a",   // Green-600
     delayed: "#ea580c", // Orange-600
     offline: "#dc2626", // Red-600
+    selected: "#f59e0b", // Amber-500 — highlighted when focused
 };
 
 export async function loadVehicleIcon(map: maplibregl.Map): Promise<void> {
