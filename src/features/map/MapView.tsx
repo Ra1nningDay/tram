@@ -64,11 +64,8 @@ export function MapView({ route, stops, vehicles, onSelectStop, onSelectVehicle,
   const { resolvedTheme } = useTheme();
 
   const isMobile = typeof window !== "undefined" ? window.innerWidth < 768 : false;
-  const mapTheme = resolvedTheme === "light" ? "light" : "dark";
-  const styleUrl =
-    mapTheme === "dark"
-      ? "https://tiles.openfreemap.org/styles/dark"
-      : "https://tiles.openfreemap.org/styles/liberty";
+  // EXPERIMENTAL: Always use "liberty" style (detailed) and invert colors in CSS for dark mode
+  const styleUrl = "https://tiles.openfreemap.org/styles/liberty";
 
   const { campusCenter } = useMemo(
     () => getCampusViewport(CAMPUS_POLYGON, { isMobile }),
@@ -82,6 +79,12 @@ export function MapView({ route, stops, vehicles, onSelectStop, onSelectVehicle,
   onSelectStopRef.current = onSelectStop;
   onSelectVehicleRef.current = onSelectVehicle;
   onMapReadyRef.current = onMapReady;
+
+  // Keep track of latest data for map re-initialization (e.g. on theme switch)
+  const routeRef = useRef(route);
+  const stopsRef = useRef(stops);
+  routeRef.current = route;
+  stopsRef.current = stops;
 
   // Initialize map ONCE
   useEffect(() => {
@@ -108,8 +111,15 @@ export function MapView({ route, stops, vehicles, onSelectStop, onSelectVehicle,
       map.addLayer(boundaryLayer);
 
       // Add data sources
-      map.addSource("route", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
-      map.addSource("stops", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
+      // FIX: Use refs to populate with current data immediately
+      map.addSource("route", {
+        type: "geojson",
+        data: routeToGeoJson(routeRef.current) ?? { type: "FeatureCollection", features: [] }
+      });
+      map.addSource("stops", {
+        type: "geojson",
+        data: stopsToGeoJson(stopsRef.current) ?? { type: "FeatureCollection", features: [] }
+      });
       map.addSource("vehicles", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
 
       map.addLayer(routeLayer);
@@ -146,7 +156,7 @@ export function MapView({ route, stops, vehicles, onSelectStop, onSelectVehicle,
       mapRef.current = null;
       mapLoadedRef.current = false;
     };
-  }, [campusCenter, isMobile, mapTheme, styleUrl]);
+  }, [campusCenter, isMobile]); // Removed mapTheme/styleUrl to prevent re-init on theme switch
 
   // Update route source
   useEffect(() => {
@@ -178,30 +188,6 @@ export function MapView({ route, stops, vehicles, onSelectStop, onSelectVehicle,
     loadVehicleIcon(map);
   }, [vehicles]);
 
-  // Initial data load
-  useEffect(() => {
-    const map = mapRef.current;
-    if (!map) return;
-
-    const handleLoad = () => {
-      const routeSource = map.getSource("route") as maplibregl.GeoJSONSource | undefined;
-      const stopsSource = map.getSource("stops") as maplibregl.GeoJSONSource | undefined;
-
-      if (routeSource && route) {
-        routeSource.setData(routeToGeoJson(route) ?? { type: "FeatureCollection", features: [] });
-      }
-      if (stopsSource && stops) {
-        stopsSource.setData(stopsToGeoJson(stops) ?? { type: "FeatureCollection", features: [] });
-      }
-    };
-
-    if (mapLoadedRef.current) {
-      handleLoad();
-    } else {
-      map.on("load", handleLoad);
-    }
-  }, [route, stops]);
-
   const handleFitBounds = () => {
     const map = mapRef.current;
     if (!map) return;
@@ -223,7 +209,13 @@ export function MapView({ route, stops, vehicles, onSelectStop, onSelectVehicle,
 
   return (
     <div className="relative h-full w-full">
-      <div ref={containerRef} className="h-full w-full" />
+      <div
+        ref={containerRef}
+        className="h-full w-full transition-[filter] duration-300"
+        style={{
+          filter: resolvedTheme === "dark" ? "invert(1) hue-rotate(180deg) brightness(0.95)" : "none"
+        }}
+      />
 
       {/* Custom Navigation Controls (Mobile: Top-Right, Desktop: Bottom-Left) */}
       <div className="absolute top-5 right-4 md:top-auto md:right-auto md:bottom-6 md:left-4 z-10 flex flex-col gap-2">

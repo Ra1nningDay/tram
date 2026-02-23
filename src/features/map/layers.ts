@@ -21,6 +21,7 @@ export const stopsLayer: SymbolLayerSpecification = {
     // Base assets are 80x80 @ pixelRatio=2 (so ~40px at icon-size=1).
     "icon-size": ["interpolate", ["linear"], ["zoom"], 13.5, 0.75, 15, 0.9, 16.5, 1.05, 18, 1.25],
     "icon-allow-overlap": true,
+    "icon-ignore-placement": true,
   },
 };
 
