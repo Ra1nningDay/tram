@@ -1,12 +1,12 @@
 import type { VehicleTelemetry } from "../hooks/useGpsReplay";
 import type { Vehicle } from "../features/shuttle/api";
 import { Bus, User, MapPin, ChevronDown, Clock, Info } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 
 interface VehiclePanelProps {
     vehicles: Vehicle[];
     telemetry: VehicleTelemetry[];
-    onSelectVehicle?: (id: string) => void;
+    onSelectVehicle?: (id: string | null) => void;
     selectedVehicleId?: string | null;
 }
 
@@ -149,10 +149,12 @@ function BusCard({
 
 export function VehiclePanel({ vehicles, telemetry, onSelectVehicle, selectedVehicleId }: VehiclePanelProps) {
     const [isMobileOpen, setIsMobileOpen] = useState(true);
+    const hasAutoSelected = useRef(false);
 
     // Auto-select first vehicle if none selected initially
     useEffect(() => {
-        if (!selectedVehicleId && vehicles.length > 0 && onSelectVehicle) {
+        if (!hasAutoSelected.current && !selectedVehicleId && vehicles.length > 0 && onSelectVehicle) {
+            hasAutoSelected.current = true;
             onSelectVehicle(vehicles[0].id);
         }
     }, [vehicles, selectedVehicleId, onSelectVehicle]);

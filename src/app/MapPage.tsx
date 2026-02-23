@@ -28,6 +28,7 @@ export function MapPage() {
   const [selectedVehicleId, setSelectedVehicleId] = useState<string | null>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
   const selectedVehicleIdRef = useRef<string | null>(null);
+  const isFlyingRef = useRef(false);
   selectedVehicleIdRef.current = selectedVehicleId;
 
   const handleMapReady = useCallback(
@@ -50,6 +51,12 @@ export function MapPage() {
           for (const f of fc.features) {
             if (f.properties?.id === selectedId) {
               f.properties.status = "selected";
+
+              // Autofocus: follow the selected vehicle if not currently flying
+              if (!isFlyingRef.current && f.geometry?.type === "Point") {
+                const coords = f.geometry.coordinates as [number, number];
+                currentMap.jumpTo({ center: coords });
+              }
             }
           }
         }
@@ -81,20 +88,31 @@ export function MapPage() {
     if (selectedVehicleId) {
       const v = vehicles.find((vehicle) => vehicle.id === selectedVehicleId);
       if (v) {
+        isFlyingRef.current = true;
         map.flyTo({ center: [v.longitude, v.latitude], zoom: 17, duration: 800 });
+        map.once("moveend", () => {
+          isFlyingRef.current = false;
+        });
       }
     } else {
+      isFlyingRef.current = true;
       map.flyTo({
         center: [campusConfig.polygon[0][0], campusConfig.polygon[0][1]],
         zoom: campusConfig.initialZoom,
         duration: 800,
       });
+      map.once("moveend", () => {
+        isFlyingRef.current = false;
+      });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedVehicleId]);
 
-  const handleSelectVehicle = useCallback((id: string) => {
-    setSelectedVehicleId((prev) => (prev === id ? null : id));
+  const handleSelectVehicle = useCallback((id: string | null) => {
+    setSelectedVehicleId((prev) => {
+      if (id === null) return null;
+      return prev === id ? null : id;
+    });
   }, []);
 
   return (

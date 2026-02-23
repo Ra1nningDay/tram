@@ -17,7 +17,7 @@ type MapViewProps = {
   stops?: Stop[];
   vehicles?: Vehicle[];
   onSelectStop: (stopId: string) => void;
-  onSelectVehicle: (vehicleId: string) => void;
+  onSelectVehicle: (vehicleId: string | null) => void;
   onMapReady?: (map: maplibregl.Map) => void;
 };
 
@@ -143,6 +143,14 @@ export function MapView({ route, stops, vehicles, onSelectStop, onSelectVehicle,
         const feature = event.features?.[0];
         const vehicleId = feature?.properties?.id as string | undefined;
         if (vehicleId) onSelectVehicleRef.current(vehicleId);
+      });
+
+      map.on("click", (e) => {
+        // If they click on the map background (not a feature), deselect
+        const features = map.queryRenderedFeatures(e.point, { layers: ["vehicles", "stops"] });
+        if (features.length === 0) {
+          onSelectVehicleRef.current(null);
+        }
       });
 
       mapLoadedRef.current = true;
