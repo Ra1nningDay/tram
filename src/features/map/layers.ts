@@ -1,4 +1,4 @@
-import type { LineLayerSpecification, CircleLayerSpecification, SymbolLayerSpecification } from "maplibre-gl";
+import type { LineLayerSpecification, SymbolLayerSpecification } from "maplibre-gl";
 
 export const routeLayer: LineLayerSpecification = {
   id: "route-line",

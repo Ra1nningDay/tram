@@ -7,7 +7,7 @@ import type maplibregl from "maplibre-gl";
 import { useRoute, useStops } from "../features/shuttle/hooks";
 import { useGpsReplay } from "../hooks/useGpsReplay";
 import { VehiclePanel } from "../components/VehiclePanel";
-import { Header } from "../components/Header";
+// import { Header } from "../components/Header";
 import campusConfig from "../data/campus-config.json";
 
 const MapView = dynamic(
@@ -105,7 +105,6 @@ export function MapPage() {
         isFlyingRef.current = false;
       });
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedVehicleId]);
 
   const handleSelectVehicle = useCallback((id: string | null) => {
@@ -128,7 +127,7 @@ export function MapPage() {
         />
       </div>
 
-      <Header />
+      {/* <Header /> */}
 
       {loading && (
         <div

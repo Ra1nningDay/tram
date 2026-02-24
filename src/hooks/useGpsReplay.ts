@@ -251,7 +251,7 @@ function advanceCursorMut(cursor: TramCursor, realDeltaMs: number): {
 /* ------------------------------------------------------------------ */
 
 function buildVehicleFeature(
-    id: string, label: string, lng: number, lat: number, heading: number, _bearing: number = 0
+    id: string, label: string, lng: number, lat: number, heading: number,
 ) {
     const rawHeading = ((heading % 360) + 360) % 360;
 
@@ -339,7 +339,7 @@ export function useGpsReplay(initialBearing: number = 0): GpsReplayState {
 
         for (const cursor of cursorsRef.current) {
             const pos = advanceCursorMut(cursor, delta);
-            features.push(buildVehicleFeature(cursor.id, cursor.label, pos.lng, pos.lat, pos.heading, bearingRef.current));
+            features.push(buildVehicleFeature(cursor.id, cursor.label, pos.lng, pos.lat, pos.heading));
             newTelemetry.push(computeTelemetry(cursor.id, cursor.label, cursor.distanceM, pos.speedKmh));
             newVehicles.push({
                 id: cursor.id,

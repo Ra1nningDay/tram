@@ -257,13 +257,13 @@ export function useStopEditor() {
 
     // Initialize with data from JSON
     const [stops, setStops] = useState<StopMarker[]>(() =>
-        shuttleData.stops.map((s, i) => ({
+        shuttleData.stops.map((s) => ({
             id: s.id,
             position: [s.longitude, s.latitude],
             name_th: s.name_th,
             name_en: s.name_en,
-            icon: (s as any).icon,
-            color: (s as any).color
+            icon: s.icon,
+            color: s.color
         }))
     );
 

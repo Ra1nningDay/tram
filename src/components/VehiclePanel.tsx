@@ -24,7 +24,6 @@ function BusCard({
     tele,
     isSelected,
     onSelect,
-    isFirst,
 }: {
     vehicle: Vehicle;
     tele: VehicleTelemetry;
