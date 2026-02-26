@@ -7,7 +7,7 @@ import type maplibregl from "maplibre-gl";
 import { useRoute, useStops } from "../features/shuttle/hooks";
 import { useGpsReplay } from "../hooks/useGpsReplay";
 import { VehiclePanel } from "../components/VehiclePanel";
-// import { Header } from "../components/Header";
+import { getCampusViewport } from "../features/map/campus-viewport";
 import campusConfig from "../data/campus-config.json";
 
 const MapView = dynamic(
@@ -96,8 +96,9 @@ export function MapPage() {
       }
     } else {
       isFlyingRef.current = true;
+      const { campusCenter } = getCampusViewport(campusConfig.polygon as [number, number][], { isMobile });
       map.flyTo({
-        center: [campusConfig.polygon[0][0], campusConfig.polygon[0][1]],
+        center: campusCenter,
         zoom: campusConfig.initialZoom,
         duration: 800,
       });

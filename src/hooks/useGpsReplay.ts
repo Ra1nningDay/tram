@@ -55,7 +55,7 @@ const ROUTE_TOTAL_M = ROUTE_CUM_DIST[ROUTE_CUM_DIST.length - 1] ?? 0;
 /*  Stop positions                                                     */
 /* ------------------------------------------------------------------ */
 
-interface StopOnRoute {
+export interface StopOnRoute {
     id: string;
     name: string;
     distanceM: number;
@@ -86,7 +86,7 @@ function projectStopToRoute(lat: number, lng: number): number {
     return bestRouteDist;
 }
 
-const STOPS_ON_ROUTE: StopOnRoute[] = (shuttleData.stops ?? []).map((s) => ({
+export const STOPS_ON_ROUTE: StopOnRoute[] = (shuttleData.stops ?? []).map((s) => ({
     id: s.id,
     name: s.name_th,
     distanceM: projectStopToRoute(s.latitude, s.longitude),
