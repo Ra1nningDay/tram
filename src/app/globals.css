@@ -147,6 +147,104 @@ body {
     background: var(--color-primary);
     transition: width 0.5s ease;
   }
+
+  .admin-shell {
+    --admin-bg-start: #f7f2e8;
+    --admin-bg-mid: #edf2f9;
+    --admin-bg-end: #e8eef7;
+    --admin-accent: #c28437;
+    --admin-accent-strong: #7a5622;
+    --admin-accent-soft: rgba(194, 132, 55, 0.16);
+    --admin-accent-glow: rgba(194, 132, 55, 0.24);
+    --admin-panel-bg: rgba(255, 250, 242, 0.78);
+    --admin-panel-strong-bg: rgba(255, 248, 235, 0.92);
+    --admin-panel-muted: rgba(237, 242, 249, 0.82);
+    --admin-panel-border: rgba(100, 116, 139, 0.16);
+    --admin-panel-border-strong: rgba(194, 132, 55, 0.28);
+    --admin-grid-line: rgba(15, 23, 42, 0.035);
+    --admin-shadow-soft: 0 18px 36px rgba(71, 85, 105, 0.12);
+    --admin-shadow-strong: 0 24px 52px rgba(122, 86, 34, 0.14);
+
+    --glass-bg: var(--admin-panel-bg);
+    --glass-strong-bg: var(--admin-panel-strong-bg);
+    --glass-border: var(--admin-panel-border);
+    --panel-border: rgba(100, 116, 139, 0.14);
+    --shadow-card: var(--admin-shadow-soft);
+    --shadow-lg: var(--admin-shadow-strong);
+    --text-soft: rgba(15, 23, 42, 0.7);
+    --text-faint: rgba(15, 23, 42, 0.48);
+    --map-control-border: var(--admin-panel-border);
+    --map-control-hover: rgba(15, 23, 42, 0.06);
+
+    isolation: isolate;
+  }
+
+  .dark .admin-shell {
+    --admin-bg-start: #171c26;
+    --admin-bg-mid: #1d2430;
+    --admin-bg-end: #141922;
+    --admin-accent: #e3b667;
+    --admin-accent-strong: #f3d18f;
+    --admin-accent-soft: rgba(227, 182, 103, 0.2);
+    --admin-accent-glow: rgba(227, 182, 103, 0.3);
+    --admin-panel-bg: rgba(20, 26, 36, 0.82);
+    --admin-panel-strong-bg: rgba(24, 31, 43, 0.92);
+    --admin-panel-muted: rgba(33, 42, 56, 0.82);
+    --admin-panel-border: rgba(148, 163, 184, 0.2);
+    --admin-panel-border-strong: rgba(227, 182, 103, 0.28);
+    --admin-grid-line: rgba(255, 255, 255, 0.05);
+    --admin-shadow-soft: 0 22px 44px rgba(0, 0, 0, 0.28);
+    --admin-shadow-strong: 0 28px 56px rgba(0, 0, 0, 0.34);
+
+    --glass-bg: var(--admin-panel-bg);
+    --glass-strong-bg: var(--admin-panel-strong-bg);
+    --glass-border: var(--admin-panel-border);
+    --panel-border: rgba(148, 163, 184, 0.16);
+    --shadow-card: var(--admin-shadow-soft);
+    --shadow-lg: var(--admin-shadow-strong);
+    --text-soft: rgba(241, 237, 237, 0.74);
+    --text-faint: rgba(241, 237, 237, 0.5);
+    --map-control-border: var(--admin-panel-border);
+    --map-control-hover: rgba(255, 255, 255, 0.08);
+  }
+
+  .admin-panel {
+    background: linear-gradient(180deg, var(--glass-strong-bg), var(--glass-bg));
+    backdrop-filter: blur(var(--blur-glass));
+    -webkit-backdrop-filter: blur(var(--blur-glass));
+    border: 1px solid var(--glass-border);
+    border-radius: 24px;
+    box-shadow: var(--shadow-card);
+  }
+
+  .admin-panel-strong {
+    background: linear-gradient(180deg, var(--glass-strong-bg), var(--admin-panel-muted));
+    backdrop-filter: blur(var(--blur-glass));
+    -webkit-backdrop-filter: blur(var(--blur-glass));
+    border: 1px solid var(--admin-panel-border-strong);
+    border-radius: 28px;
+    box-shadow: var(--shadow-lg);
+  }
+
+  .admin-shell .admin-grid {
+    background-image:
+      linear-gradient(var(--admin-grid-line) 1px, transparent 1px),
+      linear-gradient(90deg, var(--admin-grid-line) 1px, transparent 1px);
+    background-size: 34px 34px;
+  }
+}
+
+@media (max-width: 767px) {
+  .admin-shell {
+    --blur-glass: 12px;
+    --admin-shadow-soft: 0 14px 28px rgba(71, 85, 105, 0.1);
+    --admin-shadow-strong: 0 18px 34px rgba(122, 86, 34, 0.12);
+  }
+
+  .dark .admin-shell {
+    --admin-shadow-soft: 0 16px 30px rgba(0, 0, 0, 0.24);
+    --admin-shadow-strong: 0 18px 36px rgba(0, 0, 0, 0.3);
+  }
 }
 
 @keyframes slideUp {

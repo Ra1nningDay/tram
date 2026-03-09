@@ -1,15 +1,9 @@
-"use client";
+import { EditorClient } from "./EditorClient";
 
-import dynamic from "next/dynamic";
+import { requireEditorAccess } from "@/lib/auth/guards";
 
-const RouteEditorPage = dynamic(
-  () => import("../../views/RouteEditorPage").then((mod) => mod.RouteEditorPage),
-  {
-    ssr: false,
-    loading: () => <div className="h-screen w-screen bg-surface-dark" />,
-  }
-);
+export default async function EditorPage() {
+  await requireEditorAccess("/editor");
 
-export default function EditorPage() {
-  return <RouteEditorPage />;
+  return <EditorClient />;
 }

@@ -1,9 +1,11 @@
 import { useState, useCallback, useEffect, useRef } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { DrawingEditorControls, useDrawingEditor } from "../components/DrawingEditor";
 import { DrawingEditorMap } from "../features/map/DrawingEditorMap";
 import { StopEditorControls, useStopEditor } from "../components/StopEditor";
 import { StopEditorMap } from "../features/map/StopEditorMap";
 import { Route, MapPin, Pentagon, Check } from "lucide-react";
+import { LogoutButton } from "../components/auth/LogoutButton";
 import { ThemeToggle } from "../components/ThemeToggle";
 import shuttleData from "../data/shuttle-data.json";
 import campusConfig from "../data/campus-config.json";
@@ -21,6 +23,18 @@ type StopPayload = {
   icon?: string;
   color?: string;
 };
+
+type PersistErrorCode = "UNAUTHORIZED" | "FORBIDDEN";
+
+type PersistError = Error & {
+  code?: PersistErrorCode;
+};
+
+function createPersistError(message: string, code?: PersistErrorCode): PersistError {
+  const error = new Error(message) as PersistError;
+  error.code = code;
+  return error;
+}
 
 function normalizeStopPayload(stops: Array<{
   id: string;
@@ -44,7 +58,12 @@ function normalizeStopPayload(stops: Array<{
 }
 
 export function RouteEditorPage() {
-  const [activeTab, setActiveTab] = useState<EditorTab>("route");
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const initialTabParam = searchParams.get("tab");
+  const initialTab: EditorTab =
+    initialTabParam === "stops" || initialTabParam === "mask" ? initialTabParam : "route";
+  const [activeTab, setActiveTab] = useState<EditorTab>(initialTab);
   const drawingEditor = useDrawingEditor();
   const stopEditor = useStopEditor();
 
@@ -93,16 +112,49 @@ export function RouteEditorPage() {
         drawingEditor.changeMode("polygon");
         drawingEditor.loadData(maskPointsRef.current);
       }
+
+      if (newTab !== activeTab) {
+        router.replace(`/editor?tab=${newTab}`);
+      }
     },
-    [activeTab, drawingEditor]
+    [activeTab, drawingEditor, router]
   );
 
   useEffect(() => {
     if (!hasLoadedRef.current) {
-      drawingEditor.loadData(routePointsRef.current);
+      if (initialTab === "mask") {
+        drawingEditor.changeMode("polygon");
+        drawingEditor.loadData(maskPointsRef.current);
+      } else {
+        drawingEditor.changeMode("route");
+        drawingEditor.loadData(routePointsRef.current);
+      }
       hasLoadedRef.current = true;
     }
-  }, [drawingEditor]);
+  }, [drawingEditor, initialTab]);
+
+  const handlePersistFailure = useCallback(
+    (error: unknown, fallbackMessage: string) => {
+      console.error(error);
+
+      const code = error instanceof Error && "code" in error ? (error as PersistError).code : undefined;
+
+      if (code === "UNAUTHORIZED") {
+        showToastMessage("Session expired. Sign in again.");
+        router.replace("/login?next=/editor&reason=session-expired");
+        return;
+      }
+
+      if (code === "FORBIDDEN") {
+        showToastMessage("Editor role required.");
+        router.replace("/unauthorized");
+        return;
+      }
+
+      showToastMessage(fallbackMessage);
+    },
+    [router, showToastMessage]
+  );
 
   const persistEditorData = useCallback(async () => {
     const routeCoordinates = activeTab === "route" ? drawingEditor.points : routePointsRef.current;
@@ -122,9 +174,17 @@ export function RouteEditorPage() {
     });
 
     if (!res.ok) {
+      if (res.status === 401) {
+        throw createPersistError("Authentication required", "UNAUTHORIZED");
+      }
+
+      if (res.status === 403) {
+        throw createPersistError("Editor role required", "FORBIDDEN");
+      }
+
       const body = await res.json().catch(() => ({}));
       const message = typeof body?.error === "string" ? body.error : "Failed to save editor data";
-      throw new Error(message);
+      throw createPersistError(message);
     }
 
     routePointsRef.current = routeCoordinates;
@@ -141,15 +201,14 @@ export function RouteEditorPage() {
             showToastMessage("Saved to JSON files");
           })
           .catch((error: unknown) => {
-            console.error(error);
-            showToastMessage("Save failed");
+            handlePersistFailure(error, "Save failed");
           });
       }
     };
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [persistEditorData, showToastMessage]);
+  }, [handlePersistFailure, persistEditorData, showToastMessage]);
 
   const handleDrawingExport = useCallback(() => {
     drawingEditor.exportData();
@@ -158,10 +217,9 @@ export function RouteEditorPage() {
         showToastMessage("Copied and saved");
       })
       .catch((error: unknown) => {
-        console.error(error);
-        showToastMessage("Copied, but save failed");
+        handlePersistFailure(error, "Copied, but save failed");
       });
-  }, [drawingEditor, persistEditorData, showToastMessage]);
+  }, [drawingEditor, handlePersistFailure, persistEditorData, showToastMessage]);
 
   const handleStopsExport = useCallback(() => {
     stopEditor.exportStops();
@@ -170,10 +228,9 @@ export function RouteEditorPage() {
         showToastMessage("Copied and saved");
       })
       .catch((error: unknown) => {
-        console.error(error);
-        showToastMessage("Copied, but save failed");
+        handlePersistFailure(error, "Copied, but save failed");
       });
-  }, [persistEditorData, showToastMessage, stopEditor]);
+  }, [handlePersistFailure, persistEditorData, showToastMessage, stopEditor]);
 
   return (
     <div className="relative h-screen w-screen overflow-hidden">
@@ -246,7 +303,10 @@ export function RouteEditorPage() {
         </div>
       </div>
 
-      <ThemeToggle className="absolute right-4 top-20 z-20 md:right-[272px] md:top-4" />
+      <div className="absolute right-4 top-20 z-20 flex gap-2 md:right-[272px] md:top-4">
+        <ThemeToggle />
+        <LogoutButton />
+      </div>
 
       <div className="absolute right-4 top-4 z-10">
         {activeTab === "stops" ? (

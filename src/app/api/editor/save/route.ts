@@ -2,6 +2,9 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import { NextResponse } from "next/server";
 
+import { getAuth } from "@/lib/auth";
+import { userCanAccessEditor } from "@/lib/auth/roles";
+
 export const runtime = "nodejs";
 
 type LngLat = [number, number];
@@ -101,6 +104,23 @@ function parseStops(value: unknown): SaveStop[] | null {
 
 export async function POST(request: Request) {
   try {
+    const session = await getAuth().api.getSession({
+      headers: request.headers,
+      query: {
+        disableRefresh: true,
+      },
+    });
+
+    if (!session) {
+      return NextResponse.json({ ok: false, error: "Authentication required" }, { status: 401 });
+    }
+
+    const canAccessEditor = await userCanAccessEditor(session.user.id);
+
+    if (!canAccessEditor) {
+      return NextResponse.json({ ok: false, error: "Editor role required" }, { status: 403 });
+    }
+
     const body = (await request.json()) as SavePayload;
 
     const routeCoordinates =

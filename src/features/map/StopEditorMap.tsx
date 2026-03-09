@@ -1,251 +1,241 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import maplibregl from "maplibre-gl";
 import campusConfig from "../../data/campus-config.json";
-import type { CircleLayerSpecification, SymbolLayerSpecification } from "maplibre-gl";
 import { useTheme } from "next-themes";
 
-import { loadMapIcons } from "./map-utils";
 import { getCampusViewport } from "./campus-viewport";
 
 type StopMarker = {
-    id: string;
-    position: [number, number];
-    name_th: string;
-    name_en: string;
-    icon?: string;
-    color?: string;
+  id: string;
+  position: [number, number];
+  name_th: string;
+  name_en: string;
+  icon?: string;
+  color?: string;
 };
 
 type StopEditorMapProps = {
-    isPlacing: boolean;
-    stops: StopMarker[];
-    onMapClick: (lngLat: [number, number]) => void;
-    onStopMove: (index: number, lngLat: [number, number]) => void;
+  isPlacing: boolean;
+  stops: StopMarker[];
+  onMapClick: (lngLat: [number, number]) => void;
+  onStopMove: (index: number, lngLat: [number, number]) => void;
 };
 
-const stopMarkersLayer: SymbolLayerSpecification = {
-    id: "stop-markers",
-    type: "symbol",
-    source: "stop-markers",
-    layout: {
-        "icon-image": ["coalesce", ["get", "icon"], "MapPin"],
-        // Keep stops readable when zooming (editor typically uses wider zoom range than the main map).
-        "icon-size": ["interpolate", ["linear"], ["zoom"], 14, 0.7, 16, 0.9, 18, 1.1, 20, 1.35],
-        "icon-allow-overlap": true,
-    },
+const STOP_COLORS: Record<string, string> = {
+  blue: "#2563eb",
+  red: "#dc2626",
+  green: "#16a34a",
+  purple: "#9333ea",
+  orange: "#ea580c",
+  teal: "#0f766e",
 };
 
-// Fallback layer (doesn't depend on icons). If icons fail to load, stops are still visible.
-const stopMarkersFallbackLayer: CircleLayerSpecification = {
-    id: "stop-markers-fallback",
-    type: "circle",
-    source: "stop-markers",
-    paint: {
-        "circle-radius": ["interpolate", ["linear"], ["zoom"], 14, 6, 16, 8, 18, 10, 20, 12],
-        "circle-color": [
-            "match",
-            ["get", "color"],
-            "blue",
-            "#3b82f6",
-            "red",
-            "#ef4444",
-            "green",
-            "#22c55e",
-            "purple",
-            "#a855f7",
-            "orange",
-            "#f97316",
-            "teal",
-            "#14b8a6",
-            "#3b82f6",
-        ],
-        "circle-opacity": 0.95,
-        "circle-stroke-color": "#ffffff",
-        "circle-stroke-width": 2,
-    },
-};
+function getStopColor(color?: string) {
+  if (!color) {
+    return STOP_COLORS.blue;
+  }
 
-const stopLabelsLayer: SymbolLayerSpecification = {
-    id: "stop-labels",
-    type: "symbol",
-    source: "stop-markers",
-    layout: {
-        "text-field": ["get", "label"],
-        "text-size": 10,
-        "text-allow-overlap": true,
-        "text-offset": [0, 2], // Move text below icon (adjusted for larger icon)
-    },
-    paint: {
-        "text-color": "#1e293b",
-        "text-halo-color": "#ffffff",
-        "text-halo-width": 2,
-    },
-};
+  return STOP_COLORS[color] ?? STOP_COLORS.blue;
+}
+
+function createMarkerElement() {
+  const element = document.createElement("div");
+  element.style.display = "flex";
+  element.style.flexDirection = "column";
+  element.style.alignItems = "center";
+  element.style.gap = "6px";
+  element.style.transform = "translateY(-6px)";
+  element.style.userSelect = "none";
+
+  const bubble = document.createElement("div");
+  bubble.dataset.part = "bubble";
+  bubble.style.display = "flex";
+  bubble.style.height = "34px";
+  bubble.style.width = "34px";
+  bubble.style.alignItems = "center";
+  bubble.style.justifyContent = "center";
+  bubble.style.borderRadius = "9999px";
+  bubble.style.border = "2px solid rgba(255,255,255,0.95)";
+  bubble.style.boxShadow = "0 10px 24px rgba(15, 23, 42, 0.3)";
+  bubble.style.color = "#ffffff";
+  bubble.style.fontSize = "13px";
+  bubble.style.fontWeight = "700";
+  bubble.style.cursor = "grab";
+
+  const label = document.createElement("div");
+  label.dataset.part = "label";
+  label.style.maxWidth = "124px";
+  label.style.overflow = "hidden";
+  label.style.textOverflow = "ellipsis";
+  label.style.whiteSpace = "nowrap";
+  label.style.borderRadius = "9999px";
+  label.style.background = "rgba(255,255,255,0.92)";
+  label.style.padding = "2px 8px";
+  label.style.boxShadow = "0 8px 20px rgba(15, 23, 42, 0.18)";
+  label.style.color = "#0f172a";
+  label.style.fontSize = "11px";
+  label.style.fontWeight = "600";
+
+  element.append(bubble, label);
+
+  return element;
+}
+
+function updateMarkerElement(element: HTMLDivElement, stop: StopMarker, index: number) {
+  const bubble = element.querySelector('[data-part="bubble"]');
+  const label = element.querySelector('[data-part="label"]');
+
+  if (!(bubble instanceof HTMLDivElement) || !(label instanceof HTMLDivElement)) {
+    return;
+  }
+
+  const stopNumber = `${index + 1}`;
+  const stopLabel = stop.name_th?.trim() || stop.name_en?.trim() || `Stop ${index + 1}`;
+
+  element.dataset.index = String(index);
+  element.title = stopLabel;
+  bubble.textContent = stopNumber;
+  bubble.style.background = getStopColor(stop.color);
+  label.textContent = stopLabel;
+}
 
 export function StopEditorMap({ isPlacing, stops, onMapClick, onStopMove }: StopEditorMapProps) {
-    const mapRef = useRef<maplibregl.Map | null>(null);
-    const containerRef = useRef<HTMLDivElement | null>(null);
-    const [isMapReady, setIsMapReady] = useState(false);
-    const draggingRef = useRef<number | null>(null);
-    const { resolvedTheme } = useTheme();
+  const mapRef = useRef<maplibregl.Map | null>(null);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const markersRef = useRef(new Map<string, { marker: maplibregl.Marker; element: HTMLDivElement }>());
+  const [isMapReady, setIsMapReady] = useState(false);
+  const draggingRef = useRef(false);
+  const { resolvedTheme } = useTheme();
 
-    const isMobile = typeof window !== "undefined" ? window.innerWidth < 768 : false;
-    const { campusBounds, campusCenter } = useMemo(
-        () => getCampusViewport(campusConfig.polygon as [number, number][], { isMobile }),
-        [isMobile]
-    );
-    const styleUrl =
-        resolvedTheme === "light"
-            ? "https://tiles.openfreemap.org/styles/liberty"
-            : "https://tiles.openfreemap.org/styles/dark";
+  const isMobile = typeof window !== "undefined" ? window.innerWidth < 768 : false;
+  const { campusBounds, campusCenter } = useMemo(
+    () => getCampusViewport(campusConfig.polygon as [number, number][], { isMobile }),
+    [isMobile]
+  );
+  const styleUrl =
+    resolvedTheme === "light"
+      ? "https://tiles.openfreemap.org/styles/liberty"
+      : "https://tiles.openfreemap.org/styles/dark";
 
-    const onMapClickRef = useRef(onMapClick);
-    onMapClickRef.current = onMapClick;
-    const onStopMoveRef = useRef(onStopMove);
-    onStopMoveRef.current = onStopMove;
-    const isPlacingRef = useRef(isPlacing);
-    isPlacingRef.current = isPlacing;
+  const onMapClickRef = useRef(onMapClick);
+  onMapClickRef.current = onMapClick;
+  const onStopMoveRef = useRef(onStopMove);
+  onStopMoveRef.current = onStopMove;
+  const isPlacingRef = useRef(isPlacing);
+  isPlacingRef.current = isPlacing;
 
-    useEffect(() => {
-        if (!containerRef.current || mapRef.current) return;
+  useEffect(() => {
+    if (!containerRef.current || mapRef.current) return;
 
-        const map = new maplibregl.Map({
-            container: containerRef.current,
-            style: styleUrl,
-            center: campusCenter,
-            zoom: campusConfig.initialZoom,
-            minZoom: campusConfig.minZoom,
-            maxZoom: campusConfig.maxZoom,
-            maxBounds: campusBounds,
-        });
+    const map = new maplibregl.Map({
+      container: containerRef.current,
+      style: styleUrl,
+      center: campusCenter,
+      zoom: campusConfig.initialZoom,
+      minZoom: campusConfig.minZoom,
+      maxZoom: campusConfig.maxZoom,
+      maxBounds: campusBounds,
+    });
 
-        map.addControl(new maplibregl.NavigationControl({ showZoom: true }));
+    map.addControl(new maplibregl.NavigationControl({ showZoom: true }));
 
-        map.on("load", () => {
-            map.addSource("stop-markers", {
-                type: "geojson",
-                data: { type: "FeatureCollection", features: [] },
-            });
+    map.on("load", () => {
+      map.resize();
+      setIsMapReady(true);
+    });
 
-            map.addLayer(stopMarkersFallbackLayer);
-            map.addLayer(stopMarkersLayer);
-            map.addLayer(stopLabelsLayer);
+    map.on("click", (event) => {
+      if (draggingRef.current || !isPlacingRef.current) {
+        return;
+      }
 
-            loadMapIcons(map);
+      onMapClickRef.current([event.lngLat.lng, event.lngLat.lat]);
+    });
 
-            // If a symbol requests an icon that isn't in the style yet, re-load icons.
-            map.on("styleimagemissing", () => {
-                loadMapIcons(map);
-            });
+    mapRef.current = map;
 
-            setIsMapReady(true);
-        });
+    return () => {
+      for (const { marker } of markersRef.current.values()) {
+        marker.remove();
+      }
 
-        // Click to add stop
-        map.on("click", (e) => {
-            if (draggingRef.current !== null) return;
+      markersRef.current.clear();
+      map.remove();
+      mapRef.current = null;
+      setIsMapReady(false);
+    };
+  }, [campusBounds, campusCenter, styleUrl]);
 
-            const features = map.queryRenderedFeatures(e.point, { layers: ["stop-markers"] });
-            if (features.length > 0) return;
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) {
+      return;
+    }
 
-            if (isPlacingRef.current) {
-                const lngLat: [number, number] = [e.lngLat.lng, e.lngLat.lat];
-                onMapClickRef.current(lngLat);
-            }
-        });
+    map.getCanvas().style.cursor = isPlacing && !draggingRef.current ? "crosshair" : "";
+  }, [isPlacing]);
 
-        // Drag start
-        map.on("mousedown", "stop-markers", (e) => {
-            e.preventDefault();
-            const feature = e.features?.[0];
-            if (feature && typeof feature.properties?.index === "number") {
-                draggingRef.current = feature.properties.index;
-                map.getCanvas().style.cursor = "grabbing";
-                map.dragPan.disable();
-            }
-        });
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !isMapReady) {
+      return;
+    }
 
-        // Drag move
-        map.on("mousemove", (e) => {
-            if (draggingRef.current !== null) {
-                const lngLat: [number, number] = [e.lngLat.lng, e.lngLat.lat];
-                onStopMoveRef.current(draggingRef.current, lngLat);
-            }
-        });
+    const existingMarkers = markersRef.current;
+    const nextIds = new Set(stops.map((stop) => stop.id));
 
-        // Drag end
-        map.on("mouseup", () => {
-            if (draggingRef.current !== null) {
-                draggingRef.current = null;
-                map.getCanvas().style.cursor = "";
-                map.dragPan.enable();
-            }
-        });
+    for (const [stopId, markerInstance] of existingMarkers.entries()) {
+      if (!nextIds.has(stopId)) {
+        markerInstance.marker.remove();
+        existingMarkers.delete(stopId);
+      }
+    }
 
-        // Cursor
-        map.on("mouseenter", "stop-markers", () => {
-            if (draggingRef.current === null) {
-                map.getCanvas().style.cursor = "grab";
-            }
-        });
+    for (const [index, stop] of stops.entries()) {
+      const existing = existingMarkers.get(stop.id);
 
-        map.on("mouseleave", "stop-markers", () => {
-            if (draggingRef.current === null) {
-                map.getCanvas().style.cursor = isPlacingRef.current ? "crosshair" : "";
-            }
-        });
+      if (existing) {
+        existing.marker.setLngLat(stop.position);
+        updateMarkerElement(existing.element, stop, index);
+        continue;
+      }
 
-        mapRef.current = map;
+      const element = createMarkerElement();
+      updateMarkerElement(element, stop, index);
+      element.addEventListener("click", (event) => {
+        event.stopPropagation();
+      });
 
-        return () => {
-            map.remove();
-            mapRef.current = null;
-            setIsMapReady(false);
-        };
-    }, [campusBounds, campusCenter, styleUrl]);
+      const marker = new maplibregl.Marker({
+        element,
+        anchor: "bottom",
+        draggable: true,
+      })
+        .setLngLat(stop.position)
+        .addTo(map);
 
-    // Update cursor when placing mode changes
-    useEffect(() => {
-        const map = mapRef.current;
-        if (map && draggingRef.current === null) {
-            map.getCanvas().style.cursor = isPlacing ? "crosshair" : "";
+      marker.on("dragstart", () => {
+        draggingRef.current = true;
+        element.style.pointerEvents = "none";
+        map.getCanvas().style.cursor = "grabbing";
+      });
+
+      marker.on("dragend", () => {
+        const { lng, lat } = marker.getLngLat();
+        const nextIndex = Number(element.dataset.index ?? "-1");
+
+        draggingRef.current = false;
+        element.style.pointerEvents = "";
+        map.getCanvas().style.cursor = isPlacingRef.current ? "crosshair" : "";
+
+        if (nextIndex >= 0) {
+          onStopMoveRef.current(nextIndex, [lng, lat]);
         }
-    }, [isPlacing]);
+      });
 
-    // Update markers
-    useEffect(() => {
-        const map = mapRef.current;
-        if (!map || !isMapReady) return;
+      existingMarkers.set(stop.id, { marker, element });
+    }
+  }, [stops, isMapReady]);
 
-        // Fast Refresh can preserve the Map instance; ensure stop icons are present even after HMR.
-        loadMapIcons(map);
-
-        const source = map.getSource("stop-markers") as maplibregl.GeoJSONSource | undefined;
-        if (source) {
-            source.setData({
-                type: "FeatureCollection",
-                features: stops.map((stop, index) => {
-                    const iconName = stop.icon || "MapPin";
-                    const colorSuffix = stop.color ? `-${stop.color}` : "";
-                    const fullIconName = `${iconName}${colorSuffix}`;
-
-                    return {
-                        type: "Feature" as const,
-                        geometry: { type: "Point" as const, coordinates: stop.position },
-                        properties: {
-                            index,
-                            label: `${index + 1}`,
-                            name_th: stop.name_th,
-                            name_en: stop.name_en,
-                            icon: fullIconName,
-                            color: stop.color ?? "blue",
-                        },
-                    };
-                }),
-            });
-            map.triggerRepaint();
-        }
-    }, [stops, isMapReady]);
-
-    return <div ref={containerRef} className="h-full w-full" />;
+  return <div ref={containerRef} className="h-full w-full" />;
 }
