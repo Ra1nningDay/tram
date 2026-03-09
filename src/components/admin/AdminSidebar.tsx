@@ -12,64 +12,68 @@ import {
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
+import { useAdminLocale } from "@/components/admin/LocaleProvider";
 import { cn } from "@/lib/utils";
 
 type AdminNavItem = {
-  label: string;
+  labelKey: string;
   href?: string;
   icon: typeof LayoutDashboard;
   badge?: string;
-  description: string;
+  descriptionKey: string;
 };
 
 const PRIMARY_ITEMS: AdminNavItem[] = [
   {
-    label: "Overview",
+    labelKey: "sidebar.overview",
     href: "/admin",
     icon: LayoutDashboard,
-    description: "Command view and quick actions",
+    descriptionKey: "sidebar.overview_desc",
   },
   {
-    label: "Network",
+    labelKey: "sidebar.network",
     href: "/admin/network",
     icon: Waypoints,
-    badge: "Live",
-    description: "Route, stops, and service area",
+    badge: "live",
+    descriptionKey: "sidebar.network_desc",
   },
   {
-    label: "Access",
+    labelKey: "sidebar.access",
     href: "/admin/access",
     icon: ShieldCheck,
-    badge: "Live",
-    description: "Users and role memberships",
+    badge: "live",
+    descriptionKey: "sidebar.access_desc",
   },
   {
-    label: "Activity",
+    labelKey: "sidebar.activity",
     href: "/admin/activity",
     icon: Activity,
-    badge: "Live",
-    description: "Operational timeline and health",
+    badge: "live",
+    descriptionKey: "sidebar.activity_desc",
   },
 ];
 
 const TOOL_ITEMS: AdminNavItem[] = [
   {
-    label: "Open Editor",
+    labelKey: "sidebar.open_editor",
     href: "/editor",
     icon: Map,
-    badge: "Live",
-    description: "Jump into the map editing tool",
+    badge: "live",
+    descriptionKey: "sidebar.open_editor_desc",
   },
 ];
 
 function NavRow({ item, pathname }: { item: AdminNavItem; pathname: string }) {
+  const { t } = useAdminLocale();
   const isActive = Boolean(item.href) && (pathname === item.href || (item.href !== "/admin" && pathname.startsWith(`${item.href}/`)));
   const classes = cn(
     "group flex h-full items-start gap-3 rounded-[22px] border px-3 py-3 text-left transition-all duration-200",
     isActive
-      ? "border-[rgba(194,132,55,0.45)] bg-[linear-gradient(135deg,rgba(194,132,55,0.16),rgba(255,255,255,0.5))] shadow-[0_14px_30px_rgba(148,109,43,0.16)]"
-      : "border-[rgba(100,116,139,0.16)] bg-white/55 hover:border-[rgba(194,132,55,0.3)] hover:bg-white/75"
+      ? "border-[rgba(194,132,55,0.45)] bg-[linear-gradient(135deg,rgba(194,132,55,0.16),var(--admin-nav-hover))] shadow-[0_14px_30px_rgba(148,109,43,0.16)]"
+      : "border-[rgba(100,116,139,0.16)] bg-[var(--admin-nav-bg)] hover:border-[rgba(194,132,55,0.3)] hover:bg-[var(--admin-nav-hover)]"
   );
+
+  const badgeLabel = item.badge ? t(`common.${item.badge}`) : null;
 
   const content = (
     <>
@@ -77,8 +81,8 @@ function NavRow({ item, pathname }: { item: AdminNavItem; pathname: string }) {
         className={cn(
           "mt-0.5 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border",
           isActive
-            ? "border-[rgba(194,132,55,0.38)] bg-[#f4e2bf] text-[#76541e]"
-            : "border-[rgba(100,116,139,0.18)] bg-white/70 text-[var(--text-soft)]"
+            ? "border-[rgba(194,132,55,0.38)] bg-[var(--admin-accent-soft)] text-[var(--admin-accent-strong)]"
+            : "border-[rgba(100,116,139,0.18)] bg-[var(--admin-nav-icon-bg)] text-[var(--text-soft)]"
         )}
       >
         <item.icon size={17} />
@@ -86,21 +90,21 @@ function NavRow({ item, pathname }: { item: AdminNavItem; pathname: string }) {
 
       <span className="min-w-0 flex-1">
         <span className="flex items-center gap-2 text-sm font-semibold text-[var(--color-text)]">
-          <span>{item.label}</span>
-          {item.badge ? (
+          <span>{t(item.labelKey)}</span>
+          {badgeLabel ? (
             <span
               className={cn(
                 "rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.18em]",
-                item.badge === "Live"
-                  ? "bg-[#e7f5eb] text-[#18703c]"
-                  : "bg-[rgba(15,23,42,0.08)] text-[var(--text-faint)]"
+                item.badge === "live"
+                  ? "bg-[var(--admin-badge-success-bg)] text-[var(--admin-badge-success-text)]"
+                  : "bg-[var(--admin-badge-neutral-bg)] text-[var(--text-faint)]"
               )}
             >
-              {item.badge}
+              {badgeLabel}
             </span>
           ) : null}
         </span>
-        <span className="mt-1 block text-xs leading-5 text-[var(--text-soft)]">{item.description}</span>
+        <span className="mt-1 block text-xs leading-5 text-[var(--text-soft)]">{t(item.descriptionKey)}</span>
       </span>
 
       {item.href ? (
@@ -108,7 +112,7 @@ function NavRow({ item, pathname }: { item: AdminNavItem; pathname: string }) {
           size={16}
           className={cn(
             "mt-1 shrink-0 transition-transform duration-200",
-            isActive ? "text-[#76541e]" : "text-[var(--text-faint)] group-hover:translate-x-0.5 group-hover:-translate-y-0.5"
+            isActive ? "text-[var(--admin-accent-strong)]" : "text-[var(--text-faint)] group-hover:translate-x-0.5 group-hover:-translate-y-0.5"
           )}
         />
       ) : null}
@@ -132,6 +136,7 @@ function NavRow({ item, pathname }: { item: AdminNavItem; pathname: string }) {
 
 export function AdminSidebar() {
   const pathname = usePathname();
+  const { t } = useAdminLocale();
 
   return (
     <aside className="relative shrink-0 md:w-[320px] xl:w-[336px]">
@@ -148,40 +153,40 @@ export function AdminSidebar() {
             </div>
             <div>
               <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--text-faint)]">
-                Transit Control
+                {t("sidebar.brand")}
               </p>
-              <h2 className="text-lg font-semibold text-[var(--color-text)]">Admin Desk</h2>
+              <h2 className="text-lg font-semibold text-[var(--color-text)]">{t("sidebar.title")}</h2>
             </div>
           </div>
 
           <section className="space-y-2">
             <p className="px-1 text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--text-faint)]">
-              Control
+              {t("sidebar.control")}
             </p>
             <div className="grid gap-2 sm:grid-cols-2 md:grid-cols-1">
               {PRIMARY_ITEMS.map((item) => (
-                <NavRow key={item.label} item={item} pathname={pathname} />
+                <NavRow key={item.labelKey} item={item} pathname={pathname} />
               ))}
             </div>
           </section>
 
           <section className="mt-5 space-y-2">
             <p className="px-1 text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--text-faint)]">
-              Tools
+              {t("sidebar.tools")}
             </p>
             <div className="grid gap-2 sm:grid-cols-2 md:grid-cols-1">
               {TOOL_ITEMS.map((item) => (
-                <NavRow key={item.label} item={item} pathname={pathname} />
+                <NavRow key={item.labelKey} item={item} pathname={pathname} />
               ))}
             </div>
           </section>
 
           <section className="mt-5 rounded-[22px] border border-[var(--admin-panel-border)] bg-[linear-gradient(180deg,var(--glass-strong-bg),var(--admin-panel-muted))] p-4">
             <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--text-faint)]">
-              Access Model
+              {t("sidebar.access_model")}
             </p>
             <p className="mt-2 text-sm font-medium text-[var(--color-text)]">
-              Admin controls the dashboard. Editor keeps map editing access through /editor.
+              {t("sidebar.access_model_desc")}
             </p>
           </section>
         </div>

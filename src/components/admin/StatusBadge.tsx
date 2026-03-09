@@ -6,9 +6,9 @@ type StatusBadgeProps = {
 };
 
 const TONE_STYLES: Record<NonNullable<StatusBadgeProps["tone"]>, string> = {
-  success: "bg-[#e7f5eb] text-[#18703c]",
-  warning: "bg-[#fff2df] text-[#9a5800]",
-  neutral: "bg-[rgba(15,23,42,0.08)] text-[var(--text-soft)]",
+  success: "bg-[var(--admin-badge-success-bg)] text-[var(--admin-badge-success-text)]",
+  warning: "bg-[var(--admin-badge-warning-bg)] text-[var(--admin-badge-warning-text)]",
+  neutral: "bg-[var(--admin-badge-neutral-bg)] text-[var(--text-soft)]",
 };
 
 export function StatusBadge({ label, tone = "neutral" }: StatusBadgeProps) {

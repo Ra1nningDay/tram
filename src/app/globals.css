@@ -164,6 +164,18 @@ body {
     --admin-grid-line: rgba(15, 23, 42, 0.035);
     --admin-shadow-soft: 0 18px 36px rgba(71, 85, 105, 0.12);
     --admin-shadow-strong: 0 24px 52px rgba(122, 86, 34, 0.14);
+    --admin-inner-bg: rgba(255, 255, 255, 0.70);
+    --admin-inner-muted: rgba(237, 242, 249, 0.76);
+    --admin-icon-bg: rgba(15, 23, 42, 0.06);
+    --admin-badge-success-bg: #e7f5eb;
+    --admin-badge-success-text: #18703c;
+    --admin-badge-warning-bg: #fff2df;
+    --admin-badge-warning-text: #9a5800;
+    --admin-badge-neutral-bg: rgba(15, 23, 42, 0.08);
+    --admin-warning-card-bg: rgba(255, 242, 223, 0.72);
+    --admin-nav-bg: rgba(255, 255, 255, 0.55);
+    --admin-nav-hover: rgba(255, 255, 255, 0.75);
+    --admin-nav-icon-bg: rgba(255, 255, 255, 0.70);
 
     --glass-bg: var(--admin-panel-bg);
     --glass-strong-bg: var(--admin-panel-strong-bg);
@@ -195,6 +207,18 @@ body {
     --admin-grid-line: rgba(255, 255, 255, 0.05);
     --admin-shadow-soft: 0 22px 44px rgba(0, 0, 0, 0.28);
     --admin-shadow-strong: 0 28px 56px rgba(0, 0, 0, 0.34);
+    --admin-inner-bg: rgba(255, 255, 255, 0.06);
+    --admin-inner-muted: rgba(255, 255, 255, 0.05);
+    --admin-icon-bg: rgba(255, 255, 255, 0.08);
+    --admin-badge-success-bg: rgba(34, 197, 94, 0.18);
+    --admin-badge-success-text: #9fe6af;
+    --admin-badge-warning-bg: rgba(245, 158, 11, 0.18);
+    --admin-badge-warning-text: #fcd28d;
+    --admin-badge-neutral-bg: rgba(255, 255, 255, 0.08);
+    --admin-warning-card-bg: rgba(245, 158, 11, 0.12);
+    --admin-nav-bg: rgba(255, 255, 255, 0.06);
+    --admin-nav-hover: rgba(255, 255, 255, 0.1);
+    --admin-nav-icon-bg: rgba(255, 255, 255, 0.08);
 
     --glass-bg: var(--admin-panel-bg);
     --glass-strong-bg: var(--admin-panel-strong-bg);
@@ -307,4 +331,13 @@ body {
 
 ::-webkit-scrollbar-thumb:hover {
   background: var(--scrollbar-thumb-hover);
+}
+
+@layer base {
+  .maplibregl-popup-content {
+    @apply bg-transparent! shadow-none! p-0! rounded-none!;
+  }
+  .maplibregl-popup-tip {
+    @apply hidden!;
+  }
 }

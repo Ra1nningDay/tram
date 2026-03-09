@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useRef } from "react";
-import { Scan, Plus, Minus } from "lucide-react";
-import maplibregl from "maplibre-gl";
-import { useTheme } from "next-themes";
+import { useEffect, useMemo, useRef, useState, useCallback } from "react";
+import { Scan, Maximize, Minimize } from "lucide-react";
+import type { LineLayerSpecification } from "maplibre-gl";
+
+import { Map, useMap, type MapRef } from "@/components/ui/map";
 import { routeLayer, stopsLayer, vehiclesLayer } from "./layers";
 import { routeToGeoJson, stopsToGeoJson } from "./sources";
 import { loadMapIcons, loadVehicleIcon } from "./map-utils";
@@ -9,7 +10,6 @@ import { getCampusViewport } from "./campus-viewport";
 import { ThemeToggle } from "../../components/ThemeToggle";
 
 import type { Route, Stop, Vehicle } from "../shuttle/api";
-import type { LineLayerSpecification } from "maplibre-gl";
 import campusConfig from "../../data/campus-config.json";
 
 type MapViewProps = {
@@ -18,15 +18,20 @@ type MapViewProps = {
   vehicles?: Vehicle[];
   onSelectStop: (stopId: string) => void;
   onSelectVehicle: (vehicleId: string | null) => void;
-  onMapReady?: (map: maplibregl.Map) => void;
+  onMapReady?: (map: MapRef) => void;
 };
 
 // BU Campus polygon mask (from JSON config)
 const CAMPUS_POLYGON: [number, number][] = campusConfig.polygon as [number, number][];
 
+// Map tile styles (free, no API key)
+const MAP_STYLES = {
+  light: "https://tiles.openfreemap.org/styles/liberty",
+  dark: "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json",
+};
+
 // Create a closed LineString around the campus boundary
 function createBoundaryLine() {
-  // Ensure the ring is closed
   const coords = [...CAMPUS_POLYGON];
   const first = coords[0];
   const last = coords[coords.length - 1];
@@ -57,20 +62,20 @@ const boundaryLayer: LineLayerSpecification = {
   },
 };
 
-export function MapView({ route, stops, vehicles, onSelectStop, onSelectVehicle, onMapReady }: MapViewProps) {
-  const mapRef = useRef<maplibregl.Map | null>(null);
-  const containerRef = useRef<HTMLDivElement | null>(null);
-  const mapLoadedRef = useRef(false);
-  const { resolvedTheme } = useTheme();
+// ─── Child component: sets up all custom GeoJSON sources & layers after map loads ───
 
-  const isMobile = typeof window !== "undefined" ? window.innerWidth < 768 : false;
-  // EXPERIMENTAL: Always use "liberty" style (detailed) and invert colors in CSS for dark mode
-  const styleUrl = "https://tiles.openfreemap.org/styles/liberty";
+type MapLayersProps = {
+  route?: Route;
+  stops?: Stop[];
+  vehicles?: Vehicle[];
+  onSelectStop: (stopId: string) => void;
+  onSelectVehicle: (vehicleId: string | null) => void;
+  onMapReady?: (map: MapRef) => void;
+};
 
-  const { campusCenter } = useMemo(
-    () => getCampusViewport(CAMPUS_POLYGON, { isMobile }),
-    [isMobile]
-  );
+function MapLayers({ route, stops, vehicles, onSelectStop, onSelectVehicle, onMapReady }: MapLayersProps) {
+  const { map, isLoaded } = useMap();
+  const layersAddedRef = useRef(false);
 
   // Stable callback refs
   const onSelectStopRef = useRef(onSelectStop);
@@ -80,150 +85,173 @@ export function MapView({ route, stops, vehicles, onSelectStop, onSelectVehicle,
   onSelectVehicleRef.current = onSelectVehicle;
   onMapReadyRef.current = onMapReady;
 
-  // Keep track of latest data for map re-initialization (e.g. on theme switch)
+  // Keep latest data in refs for re-initialization after style changes
   const routeRef = useRef(route);
   const stopsRef = useRef(stops);
   routeRef.current = route;
   stopsRef.current = stops;
 
-  // Initialize map ONCE
+  // Add sources, layers & event handlers once the style finishes loading
   useEffect(() => {
-    if (!containerRef.current || mapRef.current) return;
+    if (!map || !isLoaded) return;
 
-    const initialBearing = isMobile ? (campusConfig.initialBearing ?? 0) : 0;
+    // mapcn fires isLoaded on every style change (theme switch).
+    // We need to re-add sources/layers each time.
+    const hasSource = !!map.getSource("route");
+    if (hasSource) {
+      // Sources already exist from a previous load — skip adding but update data
+      const routeSource = map.getSource("route") as import("maplibre-gl").GeoJSONSource | undefined;
+      const stopsSource = map.getSource("stops") as import("maplibre-gl").GeoJSONSource | undefined;
 
-    const map = new maplibregl.Map({
-      container: containerRef.current,
-      style: styleUrl,
-      center: campusCenter,
-      zoom: campusConfig.initialZoom,
-      minZoom: campusConfig.minZoom,
-      maxZoom: campusConfig.maxZoom,
-      bearing: initialBearing,
+      routeSource?.setData(routeToGeoJson(routeRef.current) ?? { type: "FeatureCollection", features: [] });
+      stopsSource?.setData(stopsToGeoJson(stopsRef.current) ?? { type: "FeatureCollection", features: [] });
+
+      // Reload icons (they get cleared on style change)
+      void Promise.all([loadMapIcons(map), loadVehicleIcon(map)]);
+      return;
+    }
+
+    // ── First-time setup ──
+
+    // Campus boundary
+    map.addSource("campus-boundary", {
+      type: "geojson",
+      data: createBoundaryLine(),
+    });
+    map.addLayer(boundaryLayer);
+
+    // Data sources
+    map.addSource("route", {
+      type: "geojson",
+      data: routeToGeoJson(routeRef.current) ?? { type: "FeatureCollection", features: [] },
+    });
+    map.addSource("stops", {
+      type: "geojson",
+      data: stopsToGeoJson(stopsRef.current) ?? { type: "FeatureCollection", features: [] },
+    });
+    map.addSource("vehicles", {
+      type: "geojson",
+      data: { type: "FeatureCollection", features: [] },
     });
 
-    map.on("load", async () => {
-      // Add campus boundary outline
-      map.addSource("campus-boundary", {
-        type: "geojson",
-        data: createBoundaryLine(),
-      });
-      map.addLayer(boundaryLayer);
+    map.addLayer(routeLayer);
+    map.addLayer(stopsLayer);
+    map.addLayer(vehiclesLayer);
 
-      // Add data sources
-      // FIX: Use refs to populate with current data immediately
-      map.addSource("route", {
-        type: "geojson",
-        data: routeToGeoJson(routeRef.current) ?? { type: "FeatureCollection", features: [] }
-      });
-      map.addSource("stops", {
-        type: "geojson",
-        data: stopsToGeoJson(stopsRef.current) ?? { type: "FeatureCollection", features: [] }
-      });
-      map.addSource("vehicles", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
+    // Load icons
+    void Promise.all([loadMapIcons(map), loadVehicleIcon(map)]);
 
-      map.addLayer(routeLayer);
-      map.addLayer(stopsLayer);
-      map.addLayer(vehiclesLayer);
+    // Hide default one-way arrows from the tile style
+    if (map.getLayer("road_oneway")) map.setLayoutProperty("road_oneway", "visibility", "none");
+    if (map.getLayer("road_oneway_opposite")) map.setLayoutProperty("road_oneway_opposite", "visibility", "none");
 
-      // Wait for all icons to load before marking map as ready
-      await Promise.all([loadMapIcons(map), loadVehicleIcon(map)]);
-
-      // Hide default one-way arrows from the style
-      if (map.getLayer("road_oneway")) map.setLayoutProperty("road_oneway", "visibility", "none");
-      if (map.getLayer("road_oneway_opposite")) map.setLayoutProperty("road_oneway_opposite", "visibility", "none");
-
-      map.on("click", "stops", (event) => {
-        const feature = event.features?.[0];
-        const stopId = feature?.properties?.id as string | undefined;
-        if (stopId) onSelectStopRef.current(stopId);
-      });
-
-      map.on("click", "vehicles", (event) => {
-        const feature = event.features?.[0];
-        const vehicleId = feature?.properties?.id as string | undefined;
-        if (vehicleId) onSelectVehicleRef.current(vehicleId);
-      });
-
-      map.on("click", (e) => {
-        // If they click on the map background (not a feature), deselect
-        const features = map.queryRenderedFeatures(e.point, { layers: ["vehicles", "stops"] });
-        if (features.length === 0) {
-          onSelectVehicleRef.current(null);
-        }
-      });
-
-      mapLoadedRef.current = true;
-      onMapReadyRef.current?.(map);
+    // Click handlers
+    map.on("click", "stops", (event) => {
+      const stopId = event.features?.[0]?.properties?.id as string | undefined;
+      if (stopId) onSelectStopRef.current(stopId);
     });
 
-    mapRef.current = map;
+    map.on("click", "vehicles", (event) => {
+      const vehicleId = event.features?.[0]?.properties?.id as string | undefined;
+      if (vehicleId) onSelectVehicleRef.current(vehicleId);
+    });
 
-    return () => {
-      map.remove();
-      mapRef.current = null;
-      mapLoadedRef.current = false;
-    };
-  }, [campusCenter, isMobile]); // Removed mapTheme/styleUrl to prevent re-init on theme switch
+    map.on("click", (e) => {
+      const features = map.queryRenderedFeatures(e.point, { layers: ["vehicles", "stops"] });
+      if (features.length === 0) {
+        onSelectVehicleRef.current(null);
+      }
+    });
 
-  // Update route source
+    layersAddedRef.current = true;
+    onMapReadyRef.current?.(map);
+  }, [map, isLoaded]);
+
+  // Update route source when data changes
   useEffect(() => {
-    const map = mapRef.current;
-    if (!map || !mapLoadedRef.current) return;
+    if (!map || !isLoaded) return;
+    const source = map.getSource("route") as import("maplibre-gl").GeoJSONSource | undefined;
+    source?.setData(routeToGeoJson(route) ?? { type: "FeatureCollection", features: [] });
+  }, [map, isLoaded, route]);
 
-    const source = map.getSource("route") as maplibregl.GeoJSONSource | undefined;
-    if (source) {
-      source.setData(routeToGeoJson(route) ?? { type: "FeatureCollection", features: [] });
-    }
-  }, [route]);
-
-  // Update stops source
+  // Update stops source when data changes
   useEffect(() => {
-    const map = mapRef.current;
-    if (!map || !mapLoadedRef.current) return;
+    if (!map || !isLoaded) return;
+    const source = map.getSource("stops") as import("maplibre-gl").GeoJSONSource | undefined;
+    source?.setData(stopsToGeoJson(stops) ?? { type: "FeatureCollection", features: [] });
+  }, [map, isLoaded, stops]);
 
-    const source = map.getSource("stops") as maplibregl.GeoJSONSource | undefined;
-    if (source) {
-      source.setData(stopsToGeoJson(stops) ?? { type: "FeatureCollection", features: [] });
-    }
-  }, [stops]);
-
-  // Vehicle rendering is handled by the animation callback (setMapUpdater in MapPage).
-  // We only need to ensure vehicle icons are loaded after HMR.
+  // Ensure vehicle icons are loaded after data or style changes
   useEffect(() => {
-    const map = mapRef.current;
-    if (!map || !mapLoadedRef.current) return;
-    loadVehicleIcon(map);
-  }, [vehicles]);
+    if (!map || !isLoaded) return;
+    void loadVehicleIcon(map);
+  }, [map, isLoaded, vehicles]);
+
+  return null; // This component only manages map state imperatively
+}
+
+// ─── Main MapView component ───
+
+export function MapView({ route, stops, vehicles, onSelectStop, onSelectVehicle, onMapReady }: MapViewProps) {
+  const mapRef = useRef<MapRef | null>(null);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  const isMobile = typeof window !== "undefined" ? window.innerWidth < 768 : false;
+  const initialBearing = isMobile ? (campusConfig.initialBearing ?? 0) : 0;
+
+  const { campusCenter } = useMemo(
+    () => getCampusViewport(CAMPUS_POLYGON, { isMobile }),
+    [isMobile]
+  );
 
   const handleFitBounds = () => {
-    const map = mapRef.current;
-    if (!map) return;
-
-    map.flyTo({
+    mapRef.current?.flyTo({
       center: campusCenter,
       zoom: campusConfig.initialZoom,
       bearing: isMobile ? (campusConfig.initialBearing ?? 0) : 0,
     });
   };
 
-  const handleZoomIn = () => {
-    mapRef.current?.zoomIn();
-  };
+  const handleFullscreen = useCallback(() => {
+    const el = containerRef.current;
+    if (!el) return;
 
-  const handleZoomOut = () => {
-    mapRef.current?.zoomOut();
-  };
+    if (!document.fullscreenElement) {
+      el.requestFullscreen().catch(() => {});
+    } else {
+      document.exitFullscreen().catch(() => {});
+    }
+  }, []);
+
+  // Listen for fullscreen change events
+  useEffect(() => {
+    const onChange = () => setIsFullscreen(!!document.fullscreenElement);
+    document.addEventListener("fullscreenchange", onChange);
+    return () => document.removeEventListener("fullscreenchange", onChange);
+  }, []);
 
   return (
-    <div className="relative h-full w-full">
-      <div
-        ref={containerRef}
-        className="h-full w-full transition-[filter] duration-300"
-        style={{
-          filter: resolvedTheme === "dark" ? "invert(1) hue-rotate(180deg) brightness(0.95)" : "none"
-        }}
-      />
+    <div ref={containerRef} className="relative h-full w-full">
+      <Map
+        ref={mapRef}
+        center={campusCenter}
+        zoom={campusConfig.initialZoom}
+        minZoom={campusConfig.minZoom}
+        maxZoom={campusConfig.maxZoom}
+        bearing={initialBearing}
+        styles={MAP_STYLES}
+      >
+        {/* Custom GeoJSON layers (campus boundary, route, stops, vehicles) */}
+        <MapLayers
+          route={route}
+          stops={stops}
+          vehicles={vehicles}
+          onSelectStop={onSelectStop}
+          onSelectVehicle={onSelectVehicle}
+          onMapReady={onMapReady}
+        />
+      </Map>
 
       {/* Custom Navigation Controls (Mobile: Below Header Right, Desktop: Bottom-Left) */}
       <div className="absolute top-[180px] right-4 md:top-auto md:right-auto md:bottom-6 md:left-4 z-10 flex flex-col gap-2 shadow-[0_8px_24px_rgba(0,0,0,0.06)] dark:shadow-none">
@@ -236,6 +264,14 @@ export function MapView({ route, stops, vehicles, onSelectStop, onSelectVehicle,
           }}
         >
           <button
+            onClick={handleFullscreen}
+            className="border-b p-2 text-[var(--color-text)] focus:outline-none hover:bg-[var(--map-control-hover)]"
+            style={{ borderColor: "var(--map-control-border)" }}
+            title={isFullscreen ? "Exit Fullscreen" : "Fullscreen"}
+          >
+            {isFullscreen ? <Minimize size={20} /> : <Maximize size={20} />}
+          </button>
+          <button
             onClick={handleFitBounds}
             className="border-b p-2 text-[var(--color-text)] focus:outline-none hover:bg-[var(--map-control-hover)]"
             style={{ borderColor: "var(--map-control-border)" }}
@@ -244,19 +280,19 @@ export function MapView({ route, stops, vehicles, onSelectStop, onSelectVehicle,
             <Scan size={20} />
           </button>
           <button
-            onClick={handleZoomIn}
+            onClick={() => mapRef.current?.zoomIn()}
             className="border-b p-2 text-[var(--color-text)] focus:outline-none hover:bg-[var(--map-control-hover)]"
             style={{ borderColor: "var(--map-control-border)" }}
             title="Zoom In"
           >
-            <Plus size={20} />
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
           </button>
           <button
-            onClick={handleZoomOut}
+            onClick={() => mapRef.current?.zoomOut()}
             className="p-2 text-[var(--color-text)] focus:outline-none hover:bg-[var(--map-control-hover)]"
             title="Zoom Out"
           >
-            <Minus size={20} />
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="5" y1="12" x2="19" y2="12"/></svg>
           </button>
         </div>
       </div>

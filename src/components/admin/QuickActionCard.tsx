@@ -29,7 +29,7 @@ export function QuickActionCard({
     tone === "dark"
       ? "border-[rgba(15,23,42,0.22)] bg-[linear-gradient(180deg,#1f2937,#111827)] text-white hover:shadow-[0_18px_34px_rgba(15,23,42,0.2)]"
       : tone === "accent"
-        ? "border-[var(--admin-panel-border-strong)] bg-[linear-gradient(180deg,var(--glass-strong-bg),rgba(255,248,238,0.96))] hover:shadow-[var(--admin-shadow-strong)]"
+        ? "border-[var(--admin-panel-border-strong)] bg-[linear-gradient(180deg,var(--glass-strong-bg),var(--glass-bg))] hover:shadow-[var(--admin-shadow-strong)]"
         : "border-[var(--admin-panel-border)] bg-[linear-gradient(180deg,var(--glass-strong-bg),var(--glass-bg))] hover:shadow-[var(--admin-shadow-soft)]"
   );
 
@@ -50,7 +50,7 @@ export function QuickActionCard({
         <span
           className={cn(
             "inline-flex h-12 w-12 items-center justify-center rounded-2xl",
-            tone === "dark" ? "bg-white/10 text-white" : "bg-[rgba(15,23,42,0.06)] text-[var(--color-text)]"
+            tone === "dark" ? "bg-white/10 text-white" : "bg-[var(--admin-icon-bg)] text-[var(--color-text)]"
           )}
         >
           {icon}

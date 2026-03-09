@@ -30,7 +30,7 @@ export function MetricCard({ label, value, hint, accent = "slate", icon }: Metri
       <div className="relative">
         <div className="flex items-center justify-between gap-3">
           <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[var(--text-faint)]">{label}</p>
-          <span className="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-[rgba(15,23,42,0.06)] text-[var(--color-text)]">
+          <span className="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-[var(--admin-icon-bg)] text-[var(--color-text)]">
             {icon ?? <TrendingUp size={18} />}
           </span>
         </div>

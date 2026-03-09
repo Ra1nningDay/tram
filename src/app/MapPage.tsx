@@ -2,7 +2,8 @@
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import dynamic from "next/dynamic";
-import type maplibregl from "maplibre-gl";
+import type { MapRef } from "@/components/ui/map";
+import { Header } from "@/components/Header";
 
 import { useRoute, useStops } from "../features/shuttle/hooks";
 import { useGpsReplay } from "../hooks/useGpsReplay";
@@ -26,19 +27,13 @@ export function MapPage() {
   const { vehicles, telemetry, loading, setMapUpdater } = useGpsReplay(initialBearing);
 
   const [selectedVehicleId, setSelectedVehicleId] = useState<string | null>(null);
-  const mapRef = useRef<maplibregl.Map | null>(null);
+  const mapRef = useRef<MapRef | null>(null);
   const selectedVehicleIdRef = useRef<string | null>(null);
   const isFlyingRef = useRef(false);
   selectedVehicleIdRef.current = selectedVehicleId;
 
   const handleMapReady = useCallback(
-    (map?: maplibregl.Map) => {
-      if (!map) {
-        mapRef.current = null;
-        setMapUpdater(null);
-        return;
-      }
-
+    (map: MapRef) => {
       mapRef.current = map;
       setMapUpdater((geojson) => {
         const currentMap = mapRef.current;
@@ -50,7 +45,7 @@ export function MapPage() {
           const fc = geojson as GeoJSON.FeatureCollection;
           for (const f of fc.features) {
             if (f.properties?.id === selectedId) {
-              f.properties.status = "selected";
+              f.properties!.status = "selected";
 
               // Autofocus: follow the selected vehicle if not currently flying
               if (!isFlyingRef.current && f.geometry?.type === "Point") {
@@ -62,7 +57,7 @@ export function MapPage() {
         }
 
         try {
-          const source = currentMap.getSource("vehicles") as maplibregl.GeoJSONSource | undefined;
+          const source = currentMap.getSource("vehicles") as import("maplibre-gl").GeoJSONSource | undefined;
           if (source) {
             source.setData(geojson as GeoJSON.GeoJSON);
           }
@@ -128,7 +123,7 @@ export function MapPage() {
         />
       </div>
 
-      {/* <Header /> */}
+      <Header />
 
       {loading && (
         <div
