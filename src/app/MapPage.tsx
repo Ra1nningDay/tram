@@ -229,10 +229,14 @@ export function MapPage() {
 
     if (selectedVehicleId) {
       const vehicle = vehicles.find((item) => item.id === selectedVehicleId);
-      if (vehicle) {
+      const targetCenter =
+        selectedVehicleCoordsRef.current ??
+        (vehicle ? ([vehicle.longitude, vehicle.latitude] as [number, number]) : null);
+
+      if (targetCenter) {
         isFlyingRef.current = true;
         map.flyTo({
-          center: [vehicle.longitude, vehicle.latitude],
+          center: targetCenter,
           zoom: 17,
           duration: 800,
         });
@@ -260,7 +264,7 @@ export function MapPage() {
     map.once("moveend", () => {
       isFlyingRef.current = false;
     });
-  }, [isMobile, selectedStopId, selectedVehicleId, vehicles]);
+  }, [isMobile, selectedStopId, selectedVehicleId]);
 
   const handleSelectVehicle = useCallback((id: string | null) => {
     setSelectedVehicleId((prev) => {

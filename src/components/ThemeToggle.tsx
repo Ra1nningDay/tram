@@ -21,9 +21,16 @@ const OPTIONS: ThemeOption[] = [
 type ThemeToggleProps = {
   className?: string;
   menuAlign?: "left" | "right";
+  mode?: "button" | "inline";
+  onSelect?: () => void;
 };
 
-export function ThemeToggle({ className, menuAlign = "right" }: ThemeToggleProps) {
+export function ThemeToggle({
+  className,
+  menuAlign = "right",
+  mode = "button",
+  onSelect,
+}: ThemeToggleProps) {
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
   const [open, setOpen] = useState(false);
@@ -50,6 +57,39 @@ export function ThemeToggle({ className, menuAlign = "right" }: ThemeToggleProps
     const current = mounted ? theme : "system";
     return OPTIONS.find((option) => option.value === current) ?? OPTIONS[2];
   }, [mounted, theme]);
+
+  const renderOptions = (itemClassName?: string) =>
+    OPTIONS.map((option) => {
+      const selected = option.value === active.value;
+
+      return (
+        <button
+          key={option.value}
+          type="button"
+          role="menuitemradio"
+          aria-checked={selected}
+          onClick={() => {
+            setTheme(option.value);
+            setOpen(false);
+            onSelect?.();
+          }}
+          className={cn(
+            "flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-sm transition-colors",
+            selected
+              ? "bg-primary text-white"
+              : "text-[var(--color-text)] hover:bg-[var(--color-surface-lighter)]",
+            itemClassName
+          )}
+        >
+          <option.Icon size={14} />
+          <span>{option.label}</span>
+        </button>
+      );
+    });
+
+  if (mode === "inline") {
+    return <div className={cn("space-y-1", className)}>{renderOptions()}</div>;
+  }
 
   return (
     <div ref={rootRef} className={cn("relative", className)}>
@@ -79,31 +119,7 @@ export function ThemeToggle({ className, menuAlign = "right" }: ThemeToggleProps
             menuAlign === "left" ? "left-0" : "right-0"
           )}
         >
-          {OPTIONS.map((option) => {
-            const selected = option.value === active.value;
-
-            return (
-              <button
-                key={option.value}
-                type="button"
-                role="menuitemradio"
-                aria-checked={selected}
-                onClick={() => {
-                  setTheme(option.value);
-                  setOpen(false);
-                }}
-                className={cn(
-                  "flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-sm transition-colors",
-                  selected
-                    ? "bg-primary text-white"
-                    : "text-[var(--color-text)] hover:bg-[var(--color-surface-lighter)]"
-                )}
-              >
-                <option.Icon size={14} />
-                <span>{option.label}</span>
-              </button>
-            );
-          })}
+          {renderOptions()}
         </div>
       )}
     </div>

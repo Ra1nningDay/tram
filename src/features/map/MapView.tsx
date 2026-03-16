@@ -13,7 +13,6 @@ import {
 import { routeToGeoJson, stopsToGeoJson } from "./sources";
 import { loadMapIcons, loadVehicleIcon } from "./map-utils";
 import { getCampusViewport } from "./campus-viewport";
-import { ThemeToggle } from "../../components/ThemeToggle";
 import { UserLocationMarker } from "./UserLocationMarker";
 import type { UserLocation } from "@/hooks/useUserLocation";
 
@@ -288,7 +287,6 @@ export function MapView({
 
       {/* Custom Navigation Controls (Mobile: Below Header Right, Desktop: Bottom-Left) */}
       <div className="absolute top-[180px] right-4 md:top-auto md:right-auto md:bottom-6 md:left-4 z-10 flex flex-col gap-2 shadow-[0_8px_24px_rgba(0,0,0,0.06)] dark:shadow-none">
-        <ThemeToggle menuAlign={isMobile ? "right" : "left"} />
         <div
           className="flex flex-col overflow-hidden rounded-lg border shadow-lg"
           style={{
