@@ -19,6 +19,34 @@ type WritableAsset = {
   status: "healthy" | "missing";
 };
 
+type RecentSessionRecord = {
+  id: string;
+  updatedAt: Date;
+  user: {
+    name: string;
+    email: string;
+  };
+};
+
+type RecentUserRecord = {
+  id: string;
+  name: string;
+  email: string;
+  createdAt: Date;
+};
+
+type RecentAssignmentRecord = {
+  userId: string;
+  assignedAt: Date;
+  role: {
+    key: string;
+  };
+  user: {
+    name: string;
+    email: string;
+  };
+};
+
 export type AdminActivityData = {
   recentActions: ActivityEvent[];
   writableAssets: WritableAsset[];
@@ -94,7 +122,12 @@ export async function getAdminActivityData(): Promise<AdminActivityData> {
     const prisma = getPrisma();
     const now = new Date();
 
-    const [recentSessions, recentUsers, recentAssignments, totalActiveSessions] = await Promise.all([
+    const [recentSessions, recentUsers, recentAssignments, totalActiveSessions]: [
+      RecentSessionRecord[],
+      RecentUserRecord[],
+      RecentAssignmentRecord[],
+      number,
+    ] = await Promise.all([
       prisma.session.findMany({
         where: {
           expiresAt: {
@@ -163,7 +196,7 @@ export async function getAdminActivityData(): Promise<AdminActivityData> {
     recentUserCount = recentUsers.length;
 
     events.push(
-      ...recentSessions.map((session) => ({
+      ...recentSessions.map((session: RecentSessionRecord) => ({
         id: `session-${session.id}`,
         kind: "session" as const,
         title: "Session refreshed",
@@ -173,7 +206,7 @@ export async function getAdminActivityData(): Promise<AdminActivityData> {
     );
 
     events.push(
-      ...recentUsers.map((user) => ({
+      ...recentUsers.map((user: RecentUserRecord) => ({
         id: `user-${user.id}`,
         kind: "user" as const,
         title: "User present in auth table",
@@ -183,7 +216,7 @@ export async function getAdminActivityData(): Promise<AdminActivityData> {
     );
 
     events.push(
-      ...recentAssignments.map((assignment, index) => ({
+      ...recentAssignments.map((assignment: RecentAssignmentRecord, index) => ({
         id: `role-${assignment.userId}-${assignment.role.key}-${index}`,
         kind: "role" as const,
         title: "Role assignment recorded",

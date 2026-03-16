@@ -7,6 +7,7 @@ import { Header } from "@/components/Header";
 
 import { useRoute, useStops } from "../features/shuttle/hooks";
 import { useGpsReplay } from "../hooks/useGpsReplay";
+import { useUserLocation } from "../hooks/useUserLocation";
 import { VehiclePanel } from "../components/VehiclePanel";
 import { getCampusViewport } from "../features/map/campus-viewport";
 import campusConfig from "../data/campus-config.json";
@@ -25,11 +26,18 @@ export function MapPage() {
   const isMobile = typeof window !== "undefined" ? window.innerWidth < 768 : false;
   const initialBearing = isMobile ? (campusConfig.initialBearing ?? 0) : 0;
   const { vehicles, telemetry, loading, setMapUpdater } = useGpsReplay(initialBearing);
+  const {
+    location: userLocation,
+    isTracking: isTrackingLocation,
+    startTracking,
+    stopTracking,
+  } = useUserLocation();
 
   const [selectedVehicleId, setSelectedVehicleId] = useState<string | null>(null);
   const mapRef = useRef<MapRef | null>(null);
   const selectedVehicleIdRef = useRef<string | null>(null);
   const isFlyingRef = useRef(false);
+  const hasFlownToUserRef = useRef(false);
   selectedVehicleIdRef.current = selectedVehicleId;
 
   const handleMapReady = useCallback(
@@ -110,6 +118,28 @@ export function MapPage() {
     });
   }, []);
 
+  // Toggle user location tracking
+  const handleToggleTracking = useCallback(() => {
+    if (isTrackingLocation) {
+      stopTracking();
+      hasFlownToUserRef.current = false;
+    } else {
+      startTracking();
+    }
+  }, [isTrackingLocation, startTracking, stopTracking]);
+
+  // Fly to user position on first location acquisition
+  useEffect(() => {
+    if (userLocation && !hasFlownToUserRef.current && mapRef.current) {
+      hasFlownToUserRef.current = true;
+      mapRef.current.flyTo({
+        center: [userLocation.longitude, userLocation.latitude],
+        zoom: 17,
+        duration: 1200,
+      });
+    }
+  }, [userLocation]);
+
   return (
     <div className="relative h-screen w-screen overflow-hidden bg-surface-dark">
       <div className="h-full w-full">
@@ -120,6 +150,9 @@ export function MapPage() {
           onSelectStop={() => { }}
           onSelectVehicle={handleSelectVehicle}
           onMapReady={handleMapReady}
+          userLocation={userLocation}
+          isTrackingLocation={isTrackingLocation}
+          onToggleTracking={handleToggleTracking}
         />
       </div>
 

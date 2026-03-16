@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
-import { Scan, Maximize, Minimize } from "lucide-react";
+import { Scan, Maximize, Minimize, Locate } from "lucide-react";
 import type { LineLayerSpecification } from "maplibre-gl";
 
 import { Map, useMap, type MapRef } from "@/components/ui/map";
@@ -8,6 +8,8 @@ import { routeToGeoJson, stopsToGeoJson } from "./sources";
 import { loadMapIcons, loadVehicleIcon } from "./map-utils";
 import { getCampusViewport } from "./campus-viewport";
 import { ThemeToggle } from "../../components/ThemeToggle";
+import { UserLocationMarker } from "./UserLocationMarker";
+import type { UserLocation } from "@/hooks/useUserLocation";
 
 import type { Route, Stop, Vehicle } from "../shuttle/api";
 import campusConfig from "../../data/campus-config.json";
@@ -19,6 +21,9 @@ type MapViewProps = {
   onSelectStop: (stopId: string) => void;
   onSelectVehicle: (vehicleId: string | null) => void;
   onMapReady?: (map: MapRef) => void;
+  userLocation?: UserLocation | null;
+  isTrackingLocation?: boolean;
+  onToggleTracking?: () => void;
 };
 
 // BU Campus polygon mask (from JSON config)
@@ -192,7 +197,7 @@ function MapLayers({ route, stops, vehicles, onSelectStop, onSelectVehicle, onMa
 
 // ─── Main MapView component ───
 
-export function MapView({ route, stops, vehicles, onSelectStop, onSelectVehicle, onMapReady }: MapViewProps) {
+export function MapView({ route, stops, vehicles, onSelectStop, onSelectVehicle, onMapReady, userLocation, isTrackingLocation, onToggleTracking }: MapViewProps) {
   const mapRef = useRef<MapRef | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -251,6 +256,9 @@ export function MapView({ route, stops, vehicles, onSelectStop, onSelectVehicle,
           onSelectVehicle={onSelectVehicle}
           onMapReady={onMapReady}
         />
+
+        {/* User position blue dot */}
+        {userLocation && <UserLocationMarker location={userLocation} />}
       </Map>
 
       {/* Custom Navigation Controls (Mobile: Below Header Right, Desktop: Bottom-Left) */}
@@ -289,11 +297,25 @@ export function MapView({ route, stops, vehicles, onSelectStop, onSelectVehicle,
           </button>
           <button
             onClick={() => mapRef.current?.zoomOut()}
-            className="p-2 text-[var(--color-text)] focus:outline-none hover:bg-[var(--map-control-hover)]"
+            className="border-b p-2 text-[var(--color-text)] focus:outline-none hover:bg-[var(--map-control-hover)]"
+            style={{ borderColor: "var(--map-control-border)" }}
             title="Zoom Out"
           >
             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="5" y1="12" x2="19" y2="12"/></svg>
           </button>
+          {onToggleTracking && (
+            <button
+              onClick={onToggleTracking}
+              className={`p-2 focus:outline-none hover:bg-[var(--map-control-hover)] ${
+                isTrackingLocation
+                  ? "text-blue-500"
+                  : "text-[var(--color-text)]"
+              }`}
+              title={isTrackingLocation ? "Stop tracking" : "Find my location"}
+            >
+              <Locate size={20} />
+            </button>
+          )}
         </div>
       </div>
     </div>
