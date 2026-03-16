@@ -111,11 +111,11 @@ export function useArrivalAlert({
   const sentAtByKeyRef = useRef<Map<string, number>>(new Map());
 
   useEffect(() => {
-    if (!enabled || typeof window === "undefined" || !("Notification" in window)) {
+    if (!enabled || typeof window === "undefined" || typeof Notification === "undefined") {
       return;
     }
 
-    const permission = window.Notification.permission;
+    const permission = Notification.permission;
     if (permission !== "granted") {
       return;
     }
@@ -129,7 +129,7 @@ export function useArrivalAlert({
       sentAtByKey: sentAtByKeyRef.current,
       notify: (title, options) => {
         try {
-          new window.Notification(title, options);
+          new Notification(title, options);
         } catch {
           // Ignore browsers that reject notification creation at runtime.
         }

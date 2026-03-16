@@ -74,7 +74,7 @@ export function MapPage() {
         )
       : undefined;
   const selectedStopName = selectedStop?.name_th ?? selectedStop?.name_en;
-  const isAlertSupported = typeof window !== "undefined" && "Notification" in window;
+  const isAlertSupported = typeof window !== "undefined" && typeof Notification !== "undefined";
 
   const handleMapReady = useCallback(
     (map: MapRef) => {
@@ -124,8 +124,8 @@ export function MapPage() {
     try {
       const stored = localStorage.getItem(ALERT_STORAGE_KEY);
       if (stored !== "true") return;
-      if (typeof window === "undefined" || !("Notification" in window)) return;
-      if (window.Notification.permission !== "granted") return;
+      if (typeof window === "undefined" || typeof Notification === "undefined") return;
+      if (Notification.permission !== "granted") return;
       setIsAlertEnabled(true);
     } catch {
       // Ignore unavailable storage.
@@ -224,19 +224,23 @@ export function MapPage() {
       return;
     }
 
-    if (typeof window === "undefined" || !("Notification" in window)) {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    if (typeof Notification === "undefined") {
       window.alert("เบราว์เซอร์นี้ยังไม่รองรับการแจ้งเตือน");
       return;
     }
 
-    if (window.Notification.permission === "denied") {
+    if (Notification.permission === "denied") {
       window.alert("การแจ้งเตือนถูกบล็อกไว้ในเบราว์เซอร์นี้");
       return;
     }
 
-    if (window.Notification.permission === "default") {
+    if (Notification.permission === "default") {
       try {
-        const permission = await window.Notification.requestPermission();
+        const permission = await Notification.requestPermission();
         if (permission !== "granted") {
           window.alert("ยังไม่ได้รับสิทธิ์สำหรับการแจ้งเตือน");
           return;
