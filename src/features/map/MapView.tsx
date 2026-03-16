@@ -1,9 +1,9 @@
-import { useEffect, useMemo, useRef, useState, useCallback } from "react";
-import { Scan, Maximize, Minimize, Locate } from "lucide-react";
+import { useEffect, useMemo, useRef } from "react";
+import { Locate, Scan } from "lucide-react";
 import type { LineLayerSpecification } from "maplibre-gl";
 
 import { Map, useMap, type MapRef } from "@/components/ui/map";
-import { routeLayer, stopsLayer, vehiclesLayer } from "./layers";
+import { routeCasingLayer, routeLayer, stopsLayer, vehiclesLayer } from "./layers";
 import { routeToGeoJson, stopsToGeoJson } from "./sources";
 import { loadMapIcons, loadVehicleIcon } from "./map-utils";
 import { getCampusViewport } from "./campus-viewport";
@@ -29,10 +29,10 @@ type MapViewProps = {
 // BU Campus polygon mask (from JSON config)
 const CAMPUS_POLYGON: [number, number][] = campusConfig.polygon as [number, number][];
 
-// Map tile styles (free, no API key)
+// Map tile styles — liberty for both; dark mode handled via CSS filter
 const MAP_STYLES = {
   light: "https://tiles.openfreemap.org/styles/liberty",
-  dark: "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json",
+  dark: "https://tiles.openfreemap.org/styles/liberty",
 };
 
 // Create a closed LineString around the campus boundary
@@ -139,6 +139,7 @@ function MapLayers({ route, stops, vehicles, onSelectStop, onSelectVehicle, onMa
       data: { type: "FeatureCollection", features: [] },
     });
 
+    map.addLayer(routeCasingLayer);
     map.addLayer(routeLayer);
     map.addLayer(stopsLayer);
     map.addLayer(vehiclesLayer);
@@ -197,10 +198,19 @@ function MapLayers({ route, stops, vehicles, onSelectStop, onSelectVehicle, onMa
 
 // ─── Main MapView component ───
 
-export function MapView({ route, stops, vehicles, onSelectStop, onSelectVehicle, onMapReady, userLocation, isTrackingLocation, onToggleTracking }: MapViewProps) {
+export function MapView({
+  route,
+  stops,
+  vehicles,
+  onSelectStop,
+  onSelectVehicle,
+  onMapReady,
+  userLocation,
+  isTrackingLocation,
+  onToggleTracking,
+}: MapViewProps) {
   const mapRef = useRef<MapRef | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
-  const [isFullscreen, setIsFullscreen] = useState(false);
 
   const isMobile = typeof window !== "undefined" ? window.innerWidth < 768 : false;
   const initialBearing = isMobile ? (campusConfig.initialBearing ?? 0) : 0;
@@ -217,24 +227,6 @@ export function MapView({ route, stops, vehicles, onSelectStop, onSelectVehicle,
       bearing: isMobile ? (campusConfig.initialBearing ?? 0) : 0,
     });
   };
-
-  const handleFullscreen = useCallback(() => {
-    const el = containerRef.current;
-    if (!el) return;
-
-    if (!document.fullscreenElement) {
-      el.requestFullscreen().catch(() => {});
-    } else {
-      document.exitFullscreen().catch(() => {});
-    }
-  }, []);
-
-  // Listen for fullscreen change events
-  useEffect(() => {
-    const onChange = () => setIsFullscreen(!!document.fullscreenElement);
-    document.addEventListener("fullscreenchange", onChange);
-    return () => document.removeEventListener("fullscreenchange", onChange);
-  }, []);
 
   return (
     <div ref={containerRef} className="relative h-full w-full">
@@ -271,14 +263,6 @@ export function MapView({ route, stops, vehicles, onSelectStop, onSelectVehicle,
             borderColor: "var(--map-control-border)",
           }}
         >
-          <button
-            onClick={handleFullscreen}
-            className="border-b p-2 text-[var(--color-text)] focus:outline-none hover:bg-[var(--map-control-hover)]"
-            style={{ borderColor: "var(--map-control-border)" }}
-            title={isFullscreen ? "Exit Fullscreen" : "Fullscreen"}
-          >
-            {isFullscreen ? <Minimize size={20} /> : <Maximize size={20} />}
-          </button>
           <button
             onClick={handleFitBounds}
             className="border-b p-2 text-[var(--color-text)] focus:outline-none hover:bg-[var(--map-control-hover)]"

@@ -37,6 +37,8 @@ export type Route = {
 export type Eta = {
   stop_id: string;
   vehicle_id?: string;
+  vehicle_label?: string;
+  line_name?: string;
   eta_minutes: number;
   arrival_time?: string;
   last_updated: string;

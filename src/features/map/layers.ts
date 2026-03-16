@@ -1,13 +1,43 @@
 import type { LineLayerSpecification, SymbolLayerSpecification } from "maplibre-gl";
 
+/** Darker casing behind the route line for depth / outline effect */
+export const routeCasingLayer: LineLayerSpecification = {
+  id: "route-casing",
+  type: "line",
+  source: "route",
+  paint: {
+    "line-color": [
+      "match", ["get", "direction"],
+      "outbound", "#0c4a6e",  // dark sky-blue
+      "inbound",  "#7c2d12",  // dark orange-brown
+      "#334155",
+    ] as unknown as string,
+    "line-width": 7,
+    "line-opacity": 0.45,
+  },
+  layout: {
+    "line-cap": "round",
+    "line-join": "round",
+  },
+};
+
 export const routeLayer: LineLayerSpecification = {
   id: "route-line",
   type: "line",
   source: "route",
   paint: {
-    "line-color": "#94a3b8", // Subtle gray (hidden)
-    "line-width": 2,
-    "line-opacity": 0, // Hidden - route is invisible, vehicles move on it
+    "line-color": [
+      "match", ["get", "direction"],
+      "outbound", "#38bdf8",  // sky-400  — cyan-blue
+      "inbound",  "#fb923c",  // orange-400
+      "#94a3b8",
+    ] as unknown as string,
+    "line-width": 4,
+    "line-opacity": 0.85,
+  },
+  layout: {
+    "line-cap": "round",
+    "line-join": "round",
   },
 };
 

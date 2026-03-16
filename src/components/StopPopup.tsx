@@ -1,8 +1,9 @@
 import type { Stop, Eta } from "../features/shuttle/api";
 import { t } from "../i18n";
 import { EtaList } from "./EtaList";
+import { formatDistance, formatWalkingTime } from "../lib/format-distance";
 
-export function StopPopup({ stop, etas }: { stop: Stop; etas: Eta[] }) {
+export function StopPopup({ stop, etas, distanceM }: { stop: Stop; etas: Eta[]; distanceM?: number }) {
   return (
     <div className="glass-card p-4 w-full md:w-auto md:min-w-[320px] animate-slideUp rounded-t-2xl rounded-b-none md:rounded-2xl shadow-2xl">
       {/* Mobile Drag Handle */}
@@ -25,6 +26,14 @@ export function StopPopup({ stop, etas }: { stop: Stop; etas: Eta[] }) {
         <div className="flex-1">
           <div className="text-lg font-bold text-[var(--color-text)]">{stop.name_th}</div>
           <div className="text-sm text-[var(--color-text-muted)]">{stop.name_en}</div>
+          {typeof distanceM === "number" && (
+            <div className="mt-2 inline-flex items-center gap-2 rounded-full border border-blue-500/20 bg-blue-500/12 px-2.5 py-1 text-xs font-medium text-blue-500">
+              <span>📍</span>
+              <span>{formatDistance(distanceM)}</span>
+              <span className="text-blue-500/50">•</span>
+              <span>เดิน {formatWalkingTime(distanceM)}</span>
+            </div>
+          )}
         </div>
       </div>
 

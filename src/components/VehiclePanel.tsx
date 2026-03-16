@@ -1,7 +1,7 @@
 import type { VehicleTelemetry } from "../hooks/useGpsReplay";
 import { STOPS_ON_ROUTE } from "../hooks/useGpsReplay";
 import type { Vehicle } from "../features/shuttle/api";
-import { Bus, User, ChevronDown, Clock, Bell } from "lucide-react";
+import { Bus, User, ChevronDown, Clock } from "lucide-react";
 import { useEffect, useState, useRef } from "react";
 
 interface VehiclePanelProps {
@@ -221,7 +221,7 @@ function BusCard({
                             {/* Vertical Divider */}
                             <div className="w-px bg-[var(--glass-border)] self-stretch my-1" />
 
-                            {/* Right: Summary + Notification (50%) */}
+                            {/* Right: Summary (50%) */}
                             <div className="flex flex-col justify-between gap-3 py-0.5 basis-1/2">
                                 {/* Route summary */}
                                 <div className="rounded-xl bg-surface-lighter/30 border border-[var(--glass-border)] px-3 py-2.5 flex-1 flex flex-col justify-center text-center">
@@ -234,15 +234,6 @@ function BusCard({
                                         <span className="text-[10px] text-primary font-semibold">{eta}</span>
                                     </div>
                                 </div>
-
-                                {/* Notifications button */}
-                                <button
-                                    className="flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-semibold bg-amber-500 text-black hover:bg-amber-400 transition-colors"
-                                    onClick={(e) => e.stopPropagation()}
-                                >
-                                    <Bell size={12} />
-                                    Notifications
-                                </button>
                             </div>
                         </div>
                     </div>

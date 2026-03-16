@@ -38,13 +38,49 @@ export type UseUserLocationOptions = {
   maximumAge?: number;
   /** Timeout for each position request in ms (default: 15 000) */
   timeout?: number;
+  /** High-accuracy mode while the tab is hidden (default: false) */
+  backgroundEnableHighAccuracy?: boolean;
+  /** Maximum age while the tab is hidden (default: 60 000) */
+  backgroundMaximumAge?: number;
+  /** Timeout while the tab is hidden (default: 30 000) */
+  backgroundTimeout?: number;
 };
 
 const DEFAULT_OPTIONS: Required<UseUserLocationOptions> = {
   enableHighAccuracy: true,
   maximumAge: 10_000,
   timeout: 15_000,
+  backgroundEnableHighAccuracy: false,
+  backgroundMaximumAge: 60_000,
+  backgroundTimeout: 30_000,
 };
+
+export type UserLocationTrackingMode = "foreground" | "background";
+
+export function getUserLocationTrackingMode(
+  visibilityState?: DocumentVisibilityState,
+): UserLocationTrackingMode {
+  return visibilityState === "hidden" ? "background" : "foreground";
+}
+
+export function getUserLocationWatchOptions(
+  options: Required<UseUserLocationOptions>,
+  mode: UserLocationTrackingMode,
+): PositionOptions {
+  if (mode === "background") {
+    return {
+      enableHighAccuracy: options.backgroundEnableHighAccuracy,
+      maximumAge: Math.max(options.maximumAge, options.backgroundMaximumAge),
+      timeout: Math.max(options.timeout, options.backgroundTimeout),
+    };
+  }
+
+  return {
+    enableHighAccuracy: options.enableHighAccuracy,
+    maximumAge: options.maximumAge,
+    timeout: options.timeout,
+  };
+}
 
 /* ------------------------------------------------------------------ */
 /*  Hook                                                               */
@@ -59,19 +95,24 @@ export function useUserLocation(
   const [isPermissionDenied, setIsPermissionDenied] = useState(false);
 
   const watchIdRef = useRef<number | null>(null);
+  const isTrackingRef = useRef(false);
   const optionsRef = useRef({ ...DEFAULT_OPTIONS, ...options });
   optionsRef.current = { ...DEFAULT_OPTIONS, ...options };
 
-  const stopTracking = useCallback(() => {
-    if (watchIdRef.current !== null) {
+  const clearActiveWatch = useCallback(() => {
+    if (watchIdRef.current !== null && "geolocation" in navigator) {
       navigator.geolocation.clearWatch(watchIdRef.current);
       watchIdRef.current = null;
     }
-    setIsTracking(false);
   }, []);
 
-  const startTracking = useCallback(() => {
-    // Guard: Geolocation API not available
+  const stopTracking = useCallback(() => {
+    isTrackingRef.current = false;
+    clearActiveWatch();
+    setIsTracking(false);
+  }, [clearActiveWatch]);
+
+  const beginWatch = useCallback((resetState: boolean) => {
     if (!("geolocation" in navigator)) {
       setError({
         code: 2, // POSITION_UNAVAILABLE
@@ -80,17 +121,20 @@ export function useUserLocation(
         POSITION_UNAVAILABLE: 2,
         TIMEOUT: 3,
       } as GeolocationPositionError);
-      return;
+      return false;
     }
 
-    // Clear previous watch if any
-    if (watchIdRef.current !== null) {
-      navigator.geolocation.clearWatch(watchIdRef.current);
+    clearActiveWatch();
+
+    if (resetState) {
+      setError(null);
+      setIsPermissionDenied(false);
     }
 
-    setError(null);
-    setIsPermissionDenied(false);
-    setIsTracking(true);
+    const trackingMode = getUserLocationTrackingMode(
+      typeof document === "undefined" ? "visible" : document.visibilityState,
+    );
+    const watchOptions = getUserLocationWatchOptions(optionsRef.current, trackingMode);
 
     const id = navigator.geolocation.watchPosition(
       (position) => {
@@ -111,25 +155,57 @@ export function useUserLocation(
           stopTracking();
         }
       },
-      {
-        enableHighAccuracy: optionsRef.current.enableHighAccuracy,
-        maximumAge: optionsRef.current.maximumAge,
-        timeout: optionsRef.current.timeout,
-      },
+      watchOptions,
     );
 
     watchIdRef.current = id;
-  }, [stopTracking]);
+    return true;
+  }, [clearActiveWatch, stopTracking]);
+
+  const startTracking = useCallback(() => {
+    const didStart = beginWatch(true);
+    if (!didStart) {
+      isTrackingRef.current = false;
+      setIsTracking(false);
+      return;
+    }
+
+    isTrackingRef.current = true;
+    setIsTracking(true);
+  }, [beginWatch]);
+
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+
+    const handleVisibilityChange = () => {
+      if (!isTrackingRef.current) return;
+      beginWatch(false);
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
+  }, [beginWatch]);
+
+  useEffect(() => {
+    if (!isTrackingRef.current) return;
+    beginWatch(false);
+  }, [
+    beginWatch,
+    options?.enableHighAccuracy,
+    options?.maximumAge,
+    options?.timeout,
+    options?.backgroundEnableHighAccuracy,
+    options?.backgroundMaximumAge,
+    options?.backgroundTimeout,
+  ]);
 
   // Clean up on unmount
   useEffect(() => {
     return () => {
-      if (watchIdRef.current !== null) {
-        navigator.geolocation.clearWatch(watchIdRef.current);
-        watchIdRef.current = null;
-      }
+      isTrackingRef.current = false;
+      clearActiveWatch();
     };
-  }, []);
+  }, [clearActiveWatch]);
 
   return {
     location,
