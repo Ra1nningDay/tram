@@ -91,7 +91,7 @@ export async function getAdminAccessData(): Promise<AdminAccessData> {
     ]);
 
     const normalizedUsers = users.map((user: typeof users[number]) => {
-      const roleKeys = [...new Set(user.userRoles.map((userRole) => userRole.role.key))].sort();
+      const roleKeys = [...new Set(user.userRoles.map((userRole: { role: { key: string } }) => userRole.role.key))].sort();
       const hasAdminAccess = roleKeys.includes(ADMIN_ROLE_KEY);
       const hasEditorAccess = hasAdminAccess || roleKeys.includes(EDITOR_ROLE_KEY);
 
@@ -105,7 +105,7 @@ export async function getAdminAccessData(): Promise<AdminAccessData> {
         roleKeys,
         activeSessionCount: user.sessions.length,
         lastSessionAt: user.sessions[0]?.updatedAt ?? null,
-        hasPasswordAccount: user.accounts.some((account) => account.providerId === "credential"),
+        hasPasswordAccount: user.accounts.some((account: { providerId: string }) => account.providerId === "credential"),
         hasAdminAccess,
         hasEditorAccess,
       };
