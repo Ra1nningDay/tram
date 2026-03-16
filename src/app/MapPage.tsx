@@ -1,20 +1,21 @@
 "use client";
 
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
+
 import type { MapRef } from "@/components/ui/map";
 import { Header } from "@/components/Header";
 
-import { useRoute, useStops, useStopEtas } from "../features/shuttle/hooks";
-import { StopPopup } from "../components/StopPopup";
-import { useGpsReplay } from "../hooks/useGpsReplay";
-import { useArrivalAlert } from "../hooks/useArrivalAlert";
-import { useUserLocation } from "../hooks/useUserLocation";
-import { useNearestStop } from "../hooks/useNearestStop";
-import { haversineM } from "../lib/geo/distance";
 import { VehiclePanel } from "../components/VehiclePanel";
-import { getCampusViewport } from "../features/map/campus-viewport";
 import campusConfig from "../data/campus-config.json";
+import { getCampusViewport } from "../features/map/campus-viewport";
+import { useRoute, useStops } from "../features/shuttle/hooks";
+import { useSimulatedInsights } from "../features/shuttle/useSimulatedInsights";
+import { useArrivalAlert } from "../hooks/useArrivalAlert";
+import { useGpsReplay } from "../hooks/useGpsReplay";
+import { useNearestStop } from "../hooks/useNearestStop";
+import { useUserLocation } from "../hooks/useUserLocation";
+import { haversineM } from "../lib/geo/distance";
 
 const ALERT_STORAGE_KEY = "map-arrival-alerts-enabled";
 const STOP_PROXIMITY_VIBRATION_DISTANCE_M = 20;
@@ -45,9 +46,11 @@ export function MapPage() {
   const [selectedVehicleId, setSelectedVehicleId] = useState<string | null>(null);
   const [selectedStopId, setSelectedStopId] = useState<string | null>(null);
   const [isAlertEnabled, setIsAlertEnabled] = useState(false);
-  const { data: etaData } = useStopEtas(selectedStopId ?? undefined);
   const mapRef = useRef<MapRef | null>(null);
   const selectedVehicleIdRef = useRef<string | null>(null);
+  const selectedVehicleCoordsRef = useRef<[number, number] | null>(null);
+  const followRafRef = useRef<number | null>(null);
+  const followLastTsRef = useRef<number | null>(null);
   const isFlyingRef = useRef(false);
   const hasFlownToUserRef = useRef(false);
   const userManuallySelectedRef = useRef(false);
@@ -58,11 +61,18 @@ export function MapPage() {
   const selectedStop = selectedStopId
     ? allStops?.find((stop) => stop.id === selectedStopId) ?? null
     : null;
+  const { etasByStopId } = useSimulatedInsights({
+    vehicles,
+    route: routeData?.route,
+    stops: allStops,
+  });
+  const selectedStopEtas = selectedStopId ? etasByStopId[selectedStopId] ?? [] : [];
+  const activeStopId = selectedStopId ?? nearestStop?.id ?? null;
   const selectedStopDistanceM =
     userLocation && selectedStop
       ? haversineM(
           [userLocation.longitude, userLocation.latitude],
-          [selectedStop.longitude, selectedStop.latitude],
+          [selectedStop.longitude, selectedStop.latitude]
         )
       : undefined;
   const proximityStop = selectedStop ?? nearestStop;
@@ -70,11 +80,17 @@ export function MapPage() {
     userLocation && proximityStop
       ? haversineM(
           [userLocation.longitude, userLocation.latitude],
-          [proximityStop.longitude, proximityStop.latitude],
+          [proximityStop.longitude, proximityStop.latitude]
         )
       : undefined;
   const selectedStopName = selectedStop?.name_th ?? selectedStop?.name_en;
-  const isAlertSupported = typeof window !== "undefined" && typeof Notification !== "undefined";
+  const selectedStopKind = selectedStop
+    ? userManuallySelectedRef.current
+      ? "selected"
+      : "nearest"
+    : null;
+  const isAlertSupported =
+    typeof window !== "undefined" && typeof Notification !== "undefined";
 
   const handleMapReady = useCallback(
     (map: MapRef) => {
@@ -83,30 +99,37 @@ export function MapPage() {
         const currentMap = mapRef.current;
         if (!currentMap || typeof currentMap.getSource !== "function") return;
 
-        // Mark the selected vehicle so the layer renders a gold icon
         const selectedId = selectedVehicleIdRef.current;
         if (selectedId && geojson && "features" in geojson) {
-          const fc = geojson as GeoJSON.FeatureCollection;
-          for (const f of fc.features) {
-            if (f.properties?.id === selectedId) {
-              f.properties!.status = "selected";
+          const featureCollection = geojson as GeoJSON.FeatureCollection;
+          let matchedSelectedVehicle = false;
 
-              // Autofocus: follow the selected vehicle if not currently flying
-              if (!isFlyingRef.current && f.geometry?.type === "Point") {
-                const coords = f.geometry.coordinates as [number, number];
-                currentMap.jumpTo({ center: coords });
-              }
+          for (const feature of featureCollection.features) {
+            if (feature.properties?.id === selectedId) {
+              matchedSelectedVehicle = true;
+              feature.properties.status = "selected";
+              selectedVehicleCoordsRef.current =
+                feature.geometry?.type === "Point"
+                  ? (feature.geometry.coordinates as [number, number])
+                  : null;
             }
           }
+
+          if (!matchedSelectedVehicle) {
+            selectedVehicleCoordsRef.current = null;
+          }
+        } else if (!selectedId) {
+          selectedVehicleCoordsRef.current = null;
         }
 
         try {
-          const source = currentMap.getSource("vehicles") as import("maplibre-gl").GeoJSONSource | undefined;
-          if (source) {
-            source.setData(geojson as GeoJSON.GeoJSON);
-          }
+          const source = currentMap.getSource("vehicles") as
+            | import("maplibre-gl").GeoJSONSource
+            | undefined;
+
+          source?.setData(geojson as GeoJSON.GeoJSON);
         } catch {
-          // The map can be torn down/recreated during theme switches; skip this frame safely.
+          // The map can be torn down and recreated during theme switches.
         }
       });
     },
@@ -115,10 +138,70 @@ export function MapPage() {
 
   useEffect(() => {
     return () => {
+      if (followRafRef.current !== null) {
+        cancelAnimationFrame(followRafRef.current);
+      }
       mapRef.current = null;
       setMapUpdater(null);
     };
   }, [setMapUpdater]);
+
+  useEffect(() => {
+    if (!selectedVehicleId) {
+      selectedVehicleCoordsRef.current = null;
+      followLastTsRef.current = null;
+      if (followRafRef.current !== null) {
+        cancelAnimationFrame(followRafRef.current);
+        followRafRef.current = null;
+      }
+      return;
+    }
+
+    const followSelectedVehicle = (timestamp: number) => {
+      const map = mapRef.current;
+      const target = selectedVehicleCoordsRef.current;
+
+      if (!map || !selectedVehicleIdRef.current) {
+        followRafRef.current = null;
+        followLastTsRef.current = null;
+        return;
+      }
+
+      if (!isFlyingRef.current && target) {
+        const center = map.getCenter();
+        const previousTimestamp = followLastTsRef.current ?? timestamp;
+        const deltaMs = Math.min(timestamp - previousTimestamp, 64);
+        const smoothing = 1 - Math.exp(-deltaMs / 140);
+
+        followLastTsRef.current = timestamp;
+        map.jumpTo({
+          center: [
+            center.lng + (target[0] - center.lng) * smoothing,
+            center.lat + (target[1] - center.lat) * smoothing,
+          ],
+        });
+      } else {
+        followLastTsRef.current = timestamp;
+      }
+
+      followRafRef.current = requestAnimationFrame(followSelectedVehicle);
+    };
+
+    if (followRafRef.current !== null) {
+      cancelAnimationFrame(followRafRef.current);
+    }
+
+    followLastTsRef.current = null;
+    followRafRef.current = requestAnimationFrame(followSelectedVehicle);
+
+    return () => {
+      if (followRafRef.current !== null) {
+        cancelAnimationFrame(followRafRef.current);
+        followRafRef.current = null;
+      }
+      followLastTsRef.current = null;
+    };
+  }, [selectedVehicleId]);
 
   useEffect(() => {
     try {
@@ -145,77 +228,100 @@ export function MapPage() {
     if (!map) return;
 
     if (selectedVehicleId) {
-      const v = vehicles.find((vehicle) => vehicle.id === selectedVehicleId);
-      if (v) {
+      const vehicle = vehicles.find((item) => item.id === selectedVehicleId);
+      if (vehicle) {
         isFlyingRef.current = true;
-        map.flyTo({ center: [v.longitude, v.latitude], zoom: 17, duration: 800 });
+        map.flyTo({
+          center: [vehicle.longitude, vehicle.latitude],
+          zoom: 17,
+          duration: 800,
+        });
         map.once("moveend", () => {
           isFlyingRef.current = false;
         });
       }
-    } else {
-      isFlyingRef.current = true;
-      const { campusCenter } = getCampusViewport(campusConfig.polygon as [number, number][], { isMobile });
-      map.flyTo({
-        center: campusCenter,
-        zoom: campusConfig.initialZoom,
-        duration: 800,
-      });
-      map.once("moveend", () => {
-        isFlyingRef.current = false;
-      });
+      return;
     }
-  }, [selectedVehicleId]);
+
+    if (selectedStopId) {
+      return;
+    }
+
+    isFlyingRef.current = true;
+    const { campusCenter } = getCampusViewport(
+      campusConfig.polygon as [number, number][],
+      { isMobile }
+    );
+    map.flyTo({
+      center: campusCenter,
+      zoom: campusConfig.initialZoom,
+      duration: 800,
+    });
+    map.once("moveend", () => {
+      isFlyingRef.current = false;
+    });
+  }, [isMobile, selectedStopId, selectedVehicleId, vehicles]);
 
   const handleSelectVehicle = useCallback((id: string | null) => {
     setSelectedVehicleId((prev) => {
       if (id === null) return null;
       return prev === id ? null : id;
     });
-    setSelectedStopId(null);
   }, []);
 
-  const handleSelectStop = useCallback((stopId: string) => {
-    setSelectedStopId((prev) => (prev === stopId ? null : stopId));
-    setSelectedVehicleId(null);
-    userManuallySelectedRef.current = true; // User tapped a stop manually
+  const handleSelectStop = useCallback(
+    (stopId: string) => {
+      setSelectedStopId((prev) => (prev === stopId ? null : stopId));
+      setSelectedVehicleId(null);
+      userManuallySelectedRef.current = true;
 
-    const stop = allStops?.find((s) => s.id === stopId);
-    if (stop && mapRef.current) {
-      isFlyingRef.current = true;
-      mapRef.current.flyTo({ center: [stop.longitude, stop.latitude], zoom: 17, duration: 800 });
-      mapRef.current.once("moveend", () => { isFlyingRef.current = false; });
-    }
-  }, [allStops]);
+      const stop = allStops?.find((item) => item.id === stopId);
+      if (stop && mapRef.current) {
+        isFlyingRef.current = true;
+        mapRef.current.flyTo({
+          center: [stop.longitude, stop.latitude],
+          zoom: 17,
+          duration: 800,
+        });
+        mapRef.current.once("moveend", () => {
+          isFlyingRef.current = false;
+        });
+      }
+    },
+    [allStops]
+  );
 
-  // Toggle user location tracking
+  const handleClearStopSelection = useCallback(() => {
+    setSelectedStopId(null);
+    userManuallySelectedRef.current = true;
+  }, []);
+
   const handleToggleTracking = useCallback(() => {
     if (isTrackingLocation) {
       stopTracking();
       hasFlownToUserRef.current = false;
       userManuallySelectedRef.current = false;
-    } else {
-      startTracking();
-      userManuallySelectedRef.current = false;
+      return;
     }
+
+    startTracking();
+    userManuallySelectedRef.current = false;
   }, [isTrackingLocation, startTracking, stopTracking]);
 
-  // Auto-select nearest stop when tracking and user hasn't manually picked one
   useEffect(() => {
     if (!isTrackingLocation || !nearestStop || userManuallySelectedRef.current) return;
     setSelectedStopId(nearestStop.id);
   }, [isTrackingLocation, nearestStop]);
 
-  // Fly to user position on first location acquisition
   useEffect(() => {
-    if (userLocation && !hasFlownToUserRef.current && mapRef.current) {
-      hasFlownToUserRef.current = true;
-      mapRef.current.flyTo({
-        center: [userLocation.longitude, userLocation.latitude],
-        zoom: 17,
-        duration: 1200,
-      });
-    }
+    if (!userLocation || hasFlownToUserRef.current || !mapRef.current) return;
+
+    hasFlownToUserRef.current = true;
+    mapRef.current.flyTo({
+      center: [userLocation.longitude, userLocation.latitude],
+      zoom: 17,
+      duration: 1200,
+    });
   }, [userLocation]);
 
   const handleToggleAlert = useCallback(async () => {
@@ -224,9 +330,7 @@ export function MapPage() {
       return;
     }
 
-    if (typeof window === "undefined") {
-      return;
-    }
+    if (typeof window === "undefined") return;
 
     if (typeof Notification === "undefined") {
       window.alert("เบราว์เซอร์นี้ยังไม่รองรับการแจ้งเตือน");
@@ -267,7 +371,11 @@ export function MapPage() {
     }
 
     if (proximityStopDistanceM < STOP_PROXIMITY_VIBRATION_DISTANCE_M) {
-      if (!hasEnteredProximityRef.current && typeof navigator !== "undefined" && "vibrate" in navigator) {
+      if (
+        !hasEnteredProximityRef.current &&
+        typeof navigator !== "undefined" &&
+        "vibrate" in navigator
+      ) {
         navigator.vibrate([100, 50, 100]);
       }
       hasEnteredProximityRef.current = true;
@@ -278,7 +386,7 @@ export function MapPage() {
   }, [proximityStop?.id, proximityStopDistanceM]);
 
   useArrivalAlert({
-    etas: etaData?.etas,
+    etas: selectedStopEtas,
     stopName: selectedStopName,
     enabled: isAlertEnabled,
   });
@@ -296,6 +404,7 @@ export function MapPage() {
           userLocation={userLocation}
           isTrackingLocation={isTrackingLocation}
           onToggleTracking={handleToggleTracking}
+          activeStopId={activeStopId}
         />
       </div>
 
@@ -313,7 +422,9 @@ export function MapPage() {
           <div className="glass-card-dark rounded-2xl px-8 py-6 shadow-xl">
             <div className="flex items-center gap-3">
               <div className="h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-              <span className="text-sm font-medium text-muted">Loading GPS data...</span>
+              <span className="text-sm font-medium text-muted">
+                Loading GPS data...
+              </span>
             </div>
           </div>
         </div>
@@ -325,27 +436,15 @@ export function MapPage() {
           telemetry={telemetry}
           onSelectVehicle={handleSelectVehicle}
           selectedVehicleId={selectedVehicleId}
+          stop={selectedStop}
+          stopEtas={selectedStopEtas}
+          stopDistanceM={selectedStopDistanceM}
+          stopKind={selectedStopKind}
+          onClearStop={selectedStop ? handleClearStopSelection : undefined}
+          isAlertEnabled={isAlertEnabled}
+          isAlertSupported={isAlertSupported}
+          onToggleAlert={handleToggleAlert}
         />
-      )}
-
-      {/* Stop ETA popup */}
-      {selectedStop && (
-        <div className="absolute bottom-4 left-1/2 z-30 w-[90vw] max-w-sm -translate-x-1/2 md:bottom-6">
-          <div className="relative">
-            <button
-              onClick={() => setSelectedStopId(null)}
-              className="absolute -top-2 -right-2 z-10 flex h-6 w-6 items-center justify-center rounded-full bg-[var(--color-surface-light)] text-[var(--color-text-muted)] shadow-md transition-colors hover:text-[var(--color-text)]"
-              title="Close"
-            >
-              ✕
-            </button>
-            <StopPopup
-              stop={selectedStop}
-              etas={etaData?.etas ?? []}
-              distanceM={selectedStopDistanceM}
-            />
-          </div>
-        </div>
       )}
     </div>
   );

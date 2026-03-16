@@ -15,7 +15,10 @@ export function routeToGeoJson(route?: Route): FeatureCollection<LineString> | n
   };
 }
 
-export function stopsToGeoJson(stops?: Stop[]): FeatureCollection<Point> | null {
+export function stopsToGeoJson(
+  stops?: Stop[],
+  activeStopId?: string | null
+): FeatureCollection<Point> | null {
   if (!stops) return null;
   return {
     type: "FeatureCollection",
@@ -32,6 +35,8 @@ export function stopsToGeoJson(stops?: Stop[]): FeatureCollection<Point> | null 
         direction: stop.direction,
         sequence: stop.sequence,
         icon: stop.icon || "MapPin",
+        active_icon: `${stop.icon || "MapPin"}-orange`,
+        is_active: stop.id === activeStopId ? 1 : 0,
       },
     })),
   };

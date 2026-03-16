@@ -1,4 +1,8 @@
-import type { LineLayerSpecification, SymbolLayerSpecification } from "maplibre-gl";
+import type {
+  CircleLayerSpecification,
+  LineLayerSpecification,
+  SymbolLayerSpecification,
+} from "maplibre-gl";
 
 /** Darker casing behind the route line for depth / outline effect */
 export const routeCasingLayer: LineLayerSpecification = {
@@ -41,17 +45,70 @@ export const routeLayer: LineLayerSpecification = {
   },
 };
 
+export const activeStopHaloLayer: CircleLayerSpecification = {
+  id: "stops-active-halo",
+  type: "circle",
+  source: "stops",
+  filter: ["==", ["get", "is_active"], 1],
+  paint: {
+    "circle-color": "#fb923c",
+    "circle-radius": [
+      "interpolate",
+      ["linear"],
+      ["zoom"],
+      13,
+      12,
+      15,
+      18,
+      17,
+      24,
+      19,
+      30,
+    ],
+    "circle-blur": 0.55,
+    "circle-opacity": 0.34,
+    "circle-stroke-color": "#fdba74",
+    "circle-stroke-width": 1.5,
+    "circle-stroke-opacity": 0.75,
+  },
+};
+
 export const stopsLayer: SymbolLayerSpecification = {
   id: "stops",
   type: "symbol",
   source: "stops",
   layout: {
-    "icon-image": ["get", "icon"],
+    "icon-image": [
+      "case",
+      ["==", ["get", "is_active"], 1],
+      ["get", "active_icon"],
+      ["get", "icon"],
+    ],
     // Scale stop icons with zoom so they stay readable when zooming in.
     // Base assets are 80x80 @ pixelRatio=2 (so ~40px at icon-size=1).
-    "icon-size": ["interpolate", ["linear"], ["zoom"], 13.5, 0.75, 15, 0.9, 16.5, 1.05, 18, 1.25],
+    "icon-size": [
+      "interpolate",
+      ["linear"],
+      ["zoom"],
+      13.5,
+      ["case", ["==", ["get", "is_active"], 1], 0.95, 0.75],
+      15,
+      ["case", ["==", ["get", "is_active"], 1], 1.1, 0.9],
+      16.5,
+      ["case", ["==", ["get", "is_active"], 1], 1.28, 1.05],
+      18,
+      ["case", ["==", ["get", "is_active"], 1], 1.5, 1.25],
+    ],
     "icon-allow-overlap": true,
     "icon-ignore-placement": true,
+  },
+  paint: {
+    "icon-opacity": [
+      "case",
+      ["==", ["get", "is_active"], 1],
+      1,
+      0.92,
+    ],
   },
 };
 

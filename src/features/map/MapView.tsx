@@ -3,7 +3,13 @@ import { Locate, Scan } from "lucide-react";
 import type { LineLayerSpecification } from "maplibre-gl";
 
 import { Map, useMap, type MapRef } from "@/components/ui/map";
-import { routeCasingLayer, routeLayer, stopsLayer, vehiclesLayer } from "./layers";
+import {
+  activeStopHaloLayer,
+  routeCasingLayer,
+  routeLayer,
+  stopsLayer,
+  vehiclesLayer,
+} from "./layers";
 import { routeToGeoJson, stopsToGeoJson } from "./sources";
 import { loadMapIcons, loadVehicleIcon } from "./map-utils";
 import { getCampusViewport } from "./campus-viewport";
@@ -24,6 +30,7 @@ type MapViewProps = {
   userLocation?: UserLocation | null;
   isTrackingLocation?: boolean;
   onToggleTracking?: () => void;
+  activeStopId?: string | null;
 };
 
 // BU Campus polygon mask (from JSON config)
@@ -76,11 +83,19 @@ type MapLayersProps = {
   onSelectStop: (stopId: string) => void;
   onSelectVehicle: (vehicleId: string | null) => void;
   onMapReady?: (map: MapRef) => void;
+  activeStopId?: string | null;
 };
 
-function MapLayers({ route, stops, vehicles, onSelectStop, onSelectVehicle, onMapReady }: MapLayersProps) {
+function MapLayers({
+  route,
+  stops,
+  vehicles,
+  onSelectStop,
+  onSelectVehicle,
+  onMapReady,
+  activeStopId,
+}: MapLayersProps) {
   const { map, isLoaded } = useMap();
-  const layersAddedRef = useRef(false);
 
   // Stable callback refs
   const onSelectStopRef = useRef(onSelectStop);
@@ -93,8 +108,10 @@ function MapLayers({ route, stops, vehicles, onSelectStop, onSelectVehicle, onMa
   // Keep latest data in refs for re-initialization after style changes
   const routeRef = useRef(route);
   const stopsRef = useRef(stops);
+  const activeStopIdRef = useRef(activeStopId);
   routeRef.current = route;
   stopsRef.current = stops;
+  activeStopIdRef.current = activeStopId;
 
   // Add sources, layers & event handlers once the style finishes loading
   useEffect(() => {
@@ -109,7 +126,12 @@ function MapLayers({ route, stops, vehicles, onSelectStop, onSelectVehicle, onMa
       const stopsSource = map.getSource("stops") as import("maplibre-gl").GeoJSONSource | undefined;
 
       routeSource?.setData(routeToGeoJson(routeRef.current) ?? { type: "FeatureCollection", features: [] });
-      stopsSource?.setData(stopsToGeoJson(stopsRef.current) ?? { type: "FeatureCollection", features: [] });
+      stopsSource?.setData(
+        stopsToGeoJson(stopsRef.current, activeStopIdRef.current) ?? {
+          type: "FeatureCollection",
+          features: [],
+        }
+      );
 
       // Reload icons (they get cleared on style change)
       void Promise.all([loadMapIcons(map), loadVehicleIcon(map)]);
@@ -132,7 +154,11 @@ function MapLayers({ route, stops, vehicles, onSelectStop, onSelectVehicle, onMa
     });
     map.addSource("stops", {
       type: "geojson",
-      data: stopsToGeoJson(stopsRef.current) ?? { type: "FeatureCollection", features: [] },
+      data:
+        stopsToGeoJson(stopsRef.current, activeStopIdRef.current) ?? {
+          type: "FeatureCollection",
+          features: [],
+        },
     });
     map.addSource("vehicles", {
       type: "geojson",
@@ -141,6 +167,7 @@ function MapLayers({ route, stops, vehicles, onSelectStop, onSelectVehicle, onMa
 
     map.addLayer(routeCasingLayer);
     map.addLayer(routeLayer);
+    map.addLayer(activeStopHaloLayer);
     map.addLayer(stopsLayer);
     map.addLayer(vehiclesLayer);
 
@@ -169,7 +196,6 @@ function MapLayers({ route, stops, vehicles, onSelectStop, onSelectVehicle, onMa
       }
     });
 
-    layersAddedRef.current = true;
     onMapReadyRef.current?.(map);
   }, [map, isLoaded]);
 
@@ -184,8 +210,13 @@ function MapLayers({ route, stops, vehicles, onSelectStop, onSelectVehicle, onMa
   useEffect(() => {
     if (!map || !isLoaded) return;
     const source = map.getSource("stops") as import("maplibre-gl").GeoJSONSource | undefined;
-    source?.setData(stopsToGeoJson(stops) ?? { type: "FeatureCollection", features: [] });
-  }, [map, isLoaded, stops]);
+    source?.setData(
+      stopsToGeoJson(stops, activeStopId) ?? {
+        type: "FeatureCollection",
+        features: [],
+      }
+    );
+  }, [map, isLoaded, stops, activeStopId]);
 
   // Ensure vehicle icons are loaded after data or style changes
   useEffect(() => {
@@ -208,6 +239,7 @@ export function MapView({
   userLocation,
   isTrackingLocation,
   onToggleTracking,
+  activeStopId,
 }: MapViewProps) {
   const mapRef = useRef<MapRef | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -247,6 +279,7 @@ export function MapView({
           onSelectStop={onSelectStop}
           onSelectVehicle={onSelectVehicle}
           onMapReady={onMapReady}
+          activeStopId={activeStopId}
         />
 
         {/* User position blue dot */}
