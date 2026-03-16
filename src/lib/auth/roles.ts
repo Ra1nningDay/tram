@@ -4,8 +4,14 @@ export const EDITOR_ROLE_KEY = "editor";
 export const ADMIN_ROLE_KEY = "admin";
 export const EDITOR_ACCESS_ROLE_KEYS = [ADMIN_ROLE_KEY, EDITOR_ROLE_KEY] as const;
 
+type UserRoleKeyRecord = {
+  role: {
+    key: string;
+  };
+};
+
 export async function getUserRoleKeys(userId: string): Promise<string[]> {
-  const userRoles = await getPrisma().userRole.findMany({
+  const userRoles: UserRoleKeyRecord[] = await getPrisma().userRole.findMany({
     where: { userId },
     select: {
       role: {
@@ -16,7 +22,7 @@ export async function getUserRoleKeys(userId: string): Promise<string[]> {
     },
   });
 
-  return userRoles.map((userRole) => userRole.role.key);
+  return userRoles.map((userRole: UserRoleKeyRecord) => userRole.role.key);
 }
 
 export async function userHasRole(userId: string, roleKey: string): Promise<boolean> {
