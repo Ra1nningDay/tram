@@ -90,7 +90,7 @@ export async function getAdminAccessData(): Promise<AdminAccessData> {
       }),
     ]);
 
-    const normalizedUsers = users.map((user) => {
+    const normalizedUsers = users.map((user: typeof users[number]) => {
       const roleKeys = [...new Set(user.userRoles.map((userRole) => userRole.role.key))].sort();
       const hasAdminAccess = roleKeys.includes(ADMIN_ROLE_KEY);
       const hasEditorAccess = hasAdminAccess || roleKeys.includes(EDITOR_ROLE_KEY);
