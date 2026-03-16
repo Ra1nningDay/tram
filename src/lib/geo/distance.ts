@@ -23,3 +23,18 @@ export function distanceMeters(a: LngLat, b: LngLat): number {
   return Math.hypot(x, y);
 }
 
+/**
+ * Haversine distance between two [lng, lat] points — accurate at any scale.
+ * Returns distance in meters.
+ */
+export function haversineM(a: LngLat, b: LngLat): number {
+  const dLat = toRad(b[1] - a[1]);
+  const dLng = toRad(b[0] - a[0]);
+  const sinDLat = Math.sin(dLat / 2);
+  const sinDLng = Math.sin(dLng / 2);
+  const h =
+    sinDLat * sinDLat +
+    Math.cos(toRad(a[1])) * Math.cos(toRad(b[1])) * sinDLng * sinDLng;
+  return 2 * R * Math.asin(Math.sqrt(h));
+}
+

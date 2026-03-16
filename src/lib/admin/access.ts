@@ -24,6 +24,36 @@ type AccessUserSummary = {
   hasEditorAccess: boolean;
 };
 
+type AccessRoleRecord = {
+  id: string;
+  key: string;
+  name: string;
+  description: string | null;
+  _count: {
+    userRoles: number;
+  };
+};
+
+type AccessUserRecord = {
+  id: string;
+  name: string;
+  email: string;
+  username: string | null;
+  emailVerified: boolean;
+  createdAt: Date;
+  userRoles: Array<{
+    role: {
+      key: string;
+    };
+  }>;
+  sessions: Array<{
+    updatedAt: Date;
+  }>;
+  accounts: Array<{
+    providerId: string;
+  }>;
+};
+
 export type AdminAccessData = {
   totalUsers: number;
   adminUsers: number;
@@ -39,7 +69,7 @@ export async function getAdminAccessData(): Promise<AdminAccessData> {
     const now = new Date();
     const prisma = getPrisma();
 
-    const [roles, users] = await Promise.all([
+    const [roles, users]: [AccessRoleRecord[], AccessUserRecord[]] = await Promise.all([
       prisma.role.findMany({
         orderBy: [{ key: "asc" }],
         include: {
@@ -90,7 +120,7 @@ export async function getAdminAccessData(): Promise<AdminAccessData> {
       }),
     ]);
 
-    const normalizedUsers = users.map((user: typeof users[number]) => {
+    const normalizedUsers: AccessUserSummary[] = users.map((user: AccessUserRecord) => {
       const roleKeys = [...new Set(user.userRoles.map((userRole: { role: { key: string } }) => userRole.role.key))].sort();
       const hasAdminAccess = roleKeys.includes(ADMIN_ROLE_KEY);
       const hasEditorAccess = hasAdminAccess || roleKeys.includes(EDITOR_ROLE_KEY);
@@ -117,7 +147,7 @@ export async function getAdminAccessData(): Promise<AdminAccessData> {
       editorUsers: normalizedUsers.filter((user) => user.hasEditorAccess).length,
       activeSessions: normalizedUsers.reduce((sum, user) => sum + user.activeSessionCount, 0),
       databaseConnected: true,
-      roles: roles.map((role) => ({
+      roles: roles.map((role: AccessRoleRecord) => ({
         id: role.id,
         key: role.key,
         name: role.name,

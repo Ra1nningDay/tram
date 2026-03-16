@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import type { Vehicle } from "../features/shuttle/api";
 import { type GpsPoint, parseTramCsvFiltered } from "../lib/csv-parser";
+import { haversineM } from "../lib/geo/distance";
 import shuttleData from "../data/shuttle-data.json";
 
 /* ------------------------------------------------------------------ */
@@ -28,17 +29,6 @@ const TELEMETRY_THROTTLE_MS = 500;
 
 const ROUTE_COORDS: [number, number][] =
     (shuttleData.routes[0]?.directions[0]?.geometry?.coordinates ?? []) as [number, number][];
-
-function haversineM(a: [number, number], b: [number, number]): number {
-    const R = 6_371_000;
-    const toRad = Math.PI / 180;
-    const dLat = (b[1] - a[1]) * toRad;
-    const dLng = (b[0] - a[0]) * toRad;
-    const sinDLat = Math.sin(dLat / 2);
-    const sinDLng = Math.sin(dLng / 2);
-    const h = sinDLat * sinDLat + Math.cos(a[1] * toRad) * Math.cos(b[1] * toRad) * sinDLng * sinDLng;
-    return 2 * R * Math.asin(Math.sqrt(h));
-}
 
 const ROUTE_CUM_DIST: number[] = [];
 {
