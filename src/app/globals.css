@@ -149,33 +149,33 @@ body {
   }
 
   .admin-shell {
-    --admin-bg-start: #f7f2e8;
-    --admin-bg-mid: #edf2f9;
-    --admin-bg-end: #e8eef7;
-    --admin-accent: #c28437;
-    --admin-accent-strong: #7a5622;
-    --admin-accent-soft: rgba(194, 132, 55, 0.16);
-    --admin-accent-glow: rgba(194, 132, 55, 0.24);
-    --admin-panel-bg: rgba(255, 250, 242, 0.78);
-    --admin-panel-strong-bg: rgba(255, 248, 235, 0.92);
-    --admin-panel-muted: rgba(237, 242, 249, 0.82);
-    --admin-panel-border: rgba(100, 116, 139, 0.16);
-    --admin-panel-border-strong: rgba(194, 132, 55, 0.28);
-    --admin-grid-line: rgba(15, 23, 42, 0.035);
-    --admin-shadow-soft: 0 18px 36px rgba(71, 85, 105, 0.12);
-    --admin-shadow-strong: 0 24px 52px rgba(122, 86, 34, 0.14);
-    --admin-inner-bg: rgba(255, 255, 255, 0.70);
-    --admin-inner-muted: rgba(237, 242, 249, 0.76);
-    --admin-icon-bg: rgba(15, 23, 42, 0.06);
-    --admin-badge-success-bg: #e7f5eb;
-    --admin-badge-success-text: #18703c;
-    --admin-badge-warning-bg: #fff2df;
-    --admin-badge-warning-text: #9a5800;
-    --admin-badge-neutral-bg: rgba(15, 23, 42, 0.08);
-    --admin-warning-card-bg: rgba(255, 242, 223, 0.72);
-    --admin-nav-bg: rgba(255, 255, 255, 0.55);
-    --admin-nav-hover: rgba(255, 255, 255, 0.75);
-    --admin-nav-icon-bg: rgba(255, 255, 255, 0.70);
+    --admin-bg-start: #f4f7fb;
+    --admin-bg-mid: #eef2f8;
+    --admin-bg-end: #e9eef5;
+    --admin-accent: #c08a3e;
+    --admin-accent-strong: #6e4e24;
+    --admin-accent-soft: rgba(192, 138, 62, 0.12);
+    --admin-accent-glow: rgba(192, 138, 62, 0.14);
+    --admin-panel-bg: rgba(255, 255, 255, 0.76);
+    --admin-panel-strong-bg: rgba(255, 255, 255, 0.92);
+    --admin-panel-muted: rgba(247, 249, 252, 0.96);
+    --admin-panel-border: rgba(148, 163, 184, 0.18);
+    --admin-panel-border-strong: rgba(192, 138, 62, 0.24);
+    --admin-grid-line: transparent;
+    --admin-shadow-soft: 0 14px 30px rgba(15, 23, 42, 0.08);
+    --admin-shadow-strong: 0 18px 40px rgba(15, 23, 42, 0.1);
+    --admin-inner-bg: rgba(255, 255, 255, 0.9);
+    --admin-inner-muted: rgba(241, 245, 249, 0.94);
+    --admin-icon-bg: rgba(15, 23, 42, 0.045);
+    --admin-badge-success-bg: #e8f7ee;
+    --admin-badge-success-text: #187a42;
+    --admin-badge-warning-bg: #fff3e0;
+    --admin-badge-warning-text: #9a5a00;
+    --admin-badge-neutral-bg: rgba(148, 163, 184, 0.16);
+    --admin-warning-card-bg: rgba(255, 243, 224, 0.72);
+    --admin-nav-bg: rgba(255, 255, 255, 0.68);
+    --admin-nav-hover: rgba(255, 255, 255, 0.96);
+    --admin-nav-icon-bg: rgba(248, 250, 252, 0.98);
 
     --glass-bg: var(--admin-panel-bg);
     --glass-strong-bg: var(--admin-panel-strong-bg);
@@ -192,33 +192,33 @@ body {
   }
 
   .dark .admin-shell {
-    --admin-bg-start: #171c26;
-    --admin-bg-mid: #1d2430;
-    --admin-bg-end: #141922;
+    --admin-bg-start: #0f172a;
+    --admin-bg-mid: #111827;
+    --admin-bg-end: #0b1220;
     --admin-accent: #e3b667;
     --admin-accent-strong: #f3d18f;
-    --admin-accent-soft: rgba(227, 182, 103, 0.2);
-    --admin-accent-glow: rgba(227, 182, 103, 0.3);
-    --admin-panel-bg: rgba(20, 26, 36, 0.82);
-    --admin-panel-strong-bg: rgba(24, 31, 43, 0.92);
-    --admin-panel-muted: rgba(33, 42, 56, 0.82);
-    --admin-panel-border: rgba(148, 163, 184, 0.2);
-    --admin-panel-border-strong: rgba(227, 182, 103, 0.28);
-    --admin-grid-line: rgba(255, 255, 255, 0.05);
-    --admin-shadow-soft: 0 22px 44px rgba(0, 0, 0, 0.28);
-    --admin-shadow-strong: 0 28px 56px rgba(0, 0, 0, 0.34);
-    --admin-inner-bg: rgba(255, 255, 255, 0.06);
-    --admin-inner-muted: rgba(255, 255, 255, 0.05);
-    --admin-icon-bg: rgba(255, 255, 255, 0.08);
+    --admin-accent-soft: rgba(227, 182, 103, 0.16);
+    --admin-accent-glow: rgba(227, 182, 103, 0.16);
+    --admin-panel-bg: rgba(15, 23, 42, 0.78);
+    --admin-panel-strong-bg: rgba(17, 24, 39, 0.9);
+    --admin-panel-muted: rgba(30, 41, 59, 0.88);
+    --admin-panel-border: rgba(148, 163, 184, 0.18);
+    --admin-panel-border-strong: rgba(227, 182, 103, 0.24);
+    --admin-grid-line: transparent;
+    --admin-shadow-soft: 0 18px 36px rgba(2, 6, 23, 0.36);
+    --admin-shadow-strong: 0 22px 44px rgba(2, 6, 23, 0.42);
+    --admin-inner-bg: rgba(30, 41, 59, 0.62);
+    --admin-inner-muted: rgba(30, 41, 59, 0.82);
+    --admin-icon-bg: rgba(255, 255, 255, 0.06);
     --admin-badge-success-bg: rgba(34, 197, 94, 0.18);
     --admin-badge-success-text: #9fe6af;
     --admin-badge-warning-bg: rgba(245, 158, 11, 0.18);
     --admin-badge-warning-text: #fcd28d;
-    --admin-badge-neutral-bg: rgba(255, 255, 255, 0.08);
+    --admin-badge-neutral-bg: rgba(148, 163, 184, 0.16);
     --admin-warning-card-bg: rgba(245, 158, 11, 0.12);
-    --admin-nav-bg: rgba(255, 255, 255, 0.06);
-    --admin-nav-hover: rgba(255, 255, 255, 0.1);
-    --admin-nav-icon-bg: rgba(255, 255, 255, 0.08);
+    --admin-nav-bg: rgba(255, 255, 255, 0.04);
+    --admin-nav-hover: rgba(255, 255, 255, 0.08);
+    --admin-nav-icon-bg: rgba(255, 255, 255, 0.06);
 
     --glass-bg: var(--admin-panel-bg);
     --glass-strong-bg: var(--admin-panel-strong-bg);
@@ -233,41 +233,38 @@ body {
   }
 
   .admin-panel {
-    background: linear-gradient(180deg, var(--glass-strong-bg), var(--glass-bg));
+    background: var(--glass-bg);
     backdrop-filter: blur(var(--blur-glass));
     -webkit-backdrop-filter: blur(var(--blur-glass));
     border: 1px solid var(--glass-border);
-    border-radius: 24px;
+    border-radius: 22px;
     box-shadow: var(--shadow-card);
   }
 
   .admin-panel-strong {
-    background: linear-gradient(180deg, var(--glass-strong-bg), var(--admin-panel-muted));
+    background: var(--glass-strong-bg);
     backdrop-filter: blur(var(--blur-glass));
     -webkit-backdrop-filter: blur(var(--blur-glass));
     border: 1px solid var(--admin-panel-border-strong);
-    border-radius: 28px;
+    border-radius: 24px;
     box-shadow: var(--shadow-lg);
   }
 
   .admin-shell .admin-grid {
-    background-image:
-      linear-gradient(var(--admin-grid-line) 1px, transparent 1px),
-      linear-gradient(90deg, var(--admin-grid-line) 1px, transparent 1px);
-    background-size: 34px 34px;
+    display: none;
   }
 }
 
 @media (max-width: 767px) {
   .admin-shell {
     --blur-glass: 12px;
-    --admin-shadow-soft: 0 14px 28px rgba(71, 85, 105, 0.1);
-    --admin-shadow-strong: 0 18px 34px rgba(122, 86, 34, 0.12);
+    --admin-shadow-soft: 0 12px 24px rgba(15, 23, 42, 0.08);
+    --admin-shadow-strong: 0 16px 28px rgba(15, 23, 42, 0.1);
   }
 
   .dark .admin-shell {
-    --admin-shadow-soft: 0 16px 30px rgba(0, 0, 0, 0.24);
-    --admin-shadow-strong: 0 18px 36px rgba(0, 0, 0, 0.3);
+    --admin-shadow-soft: 0 14px 28px rgba(2, 6, 23, 0.32);
+    --admin-shadow-strong: 0 18px 32px rgba(2, 6, 23, 0.38);
   }
 }
 
@@ -301,6 +298,33 @@ body {
 
   50% {
     opacity: 0.7;
+  }
+}
+
+@keyframes driver-orb-breathe {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+
+  50% {
+    transform: scale(1.018);
+  }
+}
+
+@keyframes driver-shimmer {
+  0% {
+    transform: translateX(-170%) rotate(18deg);
+    opacity: 0;
+  }
+
+  18% {
+    opacity: 0.55;
+  }
+
+  100% {
+    transform: translateX(340%) rotate(18deg);
+    opacity: 0;
   }
 }
 

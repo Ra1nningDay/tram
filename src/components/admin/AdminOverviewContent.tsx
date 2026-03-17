@@ -32,171 +32,200 @@ function formatRelativeDate(date: Date | null, locale: string) {
 export function AdminOverviewContent({ overview }: { overview: OverviewData }) {
   const { t, locale } = useAdminLocale();
 
+  const metrics = [
+    {
+      label: t("overview.routes"),
+      value: String(overview.routeCount),
+      hint: t("common.json_backed"),
+      accent: "amber" as const,
+      icon: <Route size={18} />,
+    },
+    {
+      label: t("overview.stops"),
+      value: String(overview.stopCount),
+      hint: t("common.json_backed"),
+      icon: <Map size={18} />,
+    },
+    {
+      label: t("overview.roles"),
+      value: String(overview.roleCount),
+      hint: t("common.credential"),
+      icon: <ShieldCheck size={18} />,
+    },
+    {
+      label: t("overview.last_update"),
+      value: formatRelativeDate(overview.lastUpdatedAt, locale) ?? t("common.no_file_timestamp"),
+      hint: t("common.verified"),
+      icon: <DatabaseZap size={18} />,
+    },
+  ];
+
+  const systemSignals = [
+    {
+      label: t("overview.authentication"),
+      value: overview.authEnabled ? t("common.enabled") : t("common.missing"),
+      tone: overview.authEnabled ? "success" as const : "warning" as const,
+      source: "Better Auth",
+    },
+    {
+      label: t("overview.editor_guard"),
+      value: overview.editorProtected ? t("common.protected") : t("common.unprotected"),
+      tone: overview.editorProtected ? "success" as const : "warning" as const,
+      source: "/editor",
+    },
+    {
+      label: t("overview.database"),
+      value: overview.databaseConnected ? t("common.connected") : t("common.degraded"),
+      tone: overview.databaseConnected ? "success" as const : "warning" as const,
+      source: "Prisma",
+    },
+  ];
+
+  const setupCards = [
+    {
+      label: t("overview.storage_mode"),
+      value: t("common.json_backed"),
+      caption: "/api/admin/export",
+    },
+    {
+      label: t("overview.mask_geometry"),
+      value: String(overview.polygonPointCount),
+      caption: t("network.service_area"),
+    },
+    {
+      label: t("sidebar.open_editor"),
+      value: "/editor",
+      caption: t("common.open"),
+    },
+  ];
+
   return (
-    <div className="space-y-4">
-      <section className="grid gap-4 lg:grid-cols-4">
-        <MetricCard
-          label={t("overview.routes")}
-          value={String(overview.routeCount)}
-          hint={t("overview.routes_hint")}
-          accent="amber"
-          icon={<Route size={18} />}
-        />
-        <MetricCard
-          label={t("overview.stops")}
-          value={String(overview.stopCount)}
-          hint={t("overview.stops_hint")}
-          icon={<Map size={18} />}
-        />
-        <MetricCard
-          label={t("overview.roles")}
-          value={String(overview.roleCount)}
-          hint={t("overview.roles_hint")}
-          icon={<ShieldCheck size={18} />}
-        />
-        <MetricCard
-          label={t("overview.last_update")}
-          value={formatRelativeDate(overview.lastUpdatedAt, locale) ?? t("common.no_file_timestamp")}
-          hint={t("overview.last_update_hint")}
-          icon={<DatabaseZap size={18} />}
-        />
+    <div className="space-y-5">
+      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        {metrics.map((metric) => (
+          <MetricCard
+            key={metric.label}
+            label={metric.label}
+            value={metric.value}
+            hint={metric.hint}
+            accent={metric.accent}
+            icon={metric.icon}
+          />
+        ))}
       </section>
 
-      <section className="grid gap-4 xl:grid-cols-[minmax(0,1.2fr)_420px]">
+      <section className="grid gap-5 xl:grid-cols-[minmax(0,1.45fr)_minmax(320px,0.9fr)]">
         <SectionCard
-          eyebrow={t("overview.quick_actions")}
-          title={t("overview.quick_actions_title")}
-          description={t("overview.quick_actions_desc")}
+          title={t("overview.quick_actions")}
+          className="h-full"
           actions={
             <Link
               href="/editor"
-              className="inline-flex items-center gap-2 rounded-2xl bg-[#1f2937] px-4 py-2.5 text-sm font-semibold text-white shadow-[0_14px_30px_rgba(15,23,42,0.2)] transition hover:translate-y-[-1px]"
+              className="inline-flex items-center gap-2 rounded-2xl bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white transition hover:-translate-y-0.5 dark:bg-slate-100 dark:text-slate-950"
             >
               <span>{t("overview.open_live_editor")}</span>
               <ArrowRight size={16} />
             </Link>
           }
         >
-          <div className="grid gap-4 lg:grid-cols-2">
+          <div className="grid gap-3 sm:grid-cols-2">
             <QuickActionCard
               href="/editor?tab=route"
               title={t("overview.route_editor")}
-              description={t("overview.route_editor_desc")}
               icon={<Route size={20} />}
-              badge={t("common.live")}
               tone="dark"
             />
             <QuickActionCard
               href="/editor?tab=stops"
               title={t("overview.stops_editor")}
-              description={t("overview.stops_editor_desc")}
               icon={<Map size={20} />}
-              badge={t("common.live")}
               tone="accent"
             />
             <QuickActionCard
               href="/editor?tab=mask"
               title={t("overview.mask_editor")}
-              description={t("overview.mask_editor_desc")}
               icon={<Pentagon size={20} />}
-              badge={t("common.live")}
             />
             <QuickActionCard
               href="/api/admin/export"
               title={t("overview.export_snapshot")}
-              description={t("overview.export_snapshot_desc")}
               icon={<DatabaseZap size={20} />}
               badge="JSON"
+              badgeTone="neutral"
               download
             />
           </div>
         </SectionCard>
 
-        <SectionCard
-          eyebrow={t("overview.system_status")}
-          title={t("overview.system_status_title")}
-          description={t("overview.system_status_desc")}
-        >
-          <div className="space-y-3">
-            <div className="rounded-2xl border border-[rgba(100,116,139,0.14)] bg-[var(--admin-inner-bg)] p-4">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <p className="text-sm font-semibold text-[var(--color-text)]">{t("overview.authentication")}</p>
-                  <p className="mt-1 text-sm text-[var(--text-soft)]">{t("overview.authentication_desc")}</p>
-                </div>
-                <StatusBadge label={overview.authEnabled ? t("common.enabled") : t("common.missing")} tone={overview.authEnabled ? "success" : "warning"} />
-              </div>
-            </div>
-
-            <div className="rounded-2xl border border-[rgba(100,116,139,0.14)] bg-[var(--admin-inner-bg)] p-4">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <p className="text-sm font-semibold text-[var(--color-text)]">{t("overview.editor_guard")}</p>
-                  <p className="mt-1 text-sm text-[var(--text-soft)]">{t("overview.editor_guard_desc")}</p>
-                </div>
-                <StatusBadge label={overview.editorProtected ? t("common.protected") : t("common.unprotected")} tone={overview.editorProtected ? "success" : "warning"} />
-              </div>
-            </div>
-
-            <div className="rounded-2xl border border-[rgba(100,116,139,0.14)] bg-[var(--admin-inner-bg)] p-4">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <p className="text-sm font-semibold text-[var(--color-text)]">{t("overview.database")}</p>
-                  <p className="mt-1 text-sm text-[var(--text-soft)]">{t("overview.database_desc")}</p>
-                </div>
-                <StatusBadge label={overview.databaseConnected ? t("common.connected") : t("common.degraded")} tone={overview.databaseConnected ? "success" : "warning"} />
-              </div>
-            </div>
-          </div>
-        </SectionCard>
-      </section>
-
-      <section className="grid gap-4 xl:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]">
-        <SectionCard
-          eyebrow={t("overview.recent_snapshot")}
-          title={t("overview.recent_snapshot_title")}
-          description={t("overview.recent_snapshot_desc")}
-        >
-          <div className="space-y-3">
-            {overview.snapshotFiles.map((file) => (
+        <SectionCard title={t("overview.system_status")} className="h-full">
+          <div className="grid gap-3">
+            {systemSignals.map((signal) => (
               <div
-                key={file.label}
-                className="flex flex-col gap-2 rounded-2xl border border-[rgba(100,116,139,0.14)] bg-[var(--admin-inner-bg)] px-4 py-4 sm:flex-row sm:items-center sm:justify-between"
+                key={signal.label}
+                className="rounded-[18px] border border-[var(--admin-panel-border)] bg-[var(--admin-inner-bg)] px-4 py-3"
               >
-                <div>
-                  <p className="text-sm font-semibold text-[var(--color-text)]">{file.label}</p>
-                  <p className="mt-1 text-sm text-[var(--text-soft)]">
-                    {file.updatedAt ? formatRelativeDate(file.updatedAt, locale) : t("common.file_not_found")}
-                  </p>
-                </div>
-                <div className="text-sm font-medium text-[var(--text-soft)]">
-                  {file.sizeKb ? `${file.sizeKb} KB` : t("common.no_size")}
+                <div className="flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-[var(--color-text)]">{signal.label}</p>
+                    <p className="mt-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--text-faint)]">
+                      {signal.source}
+                    </p>
+                  </div>
+                  <StatusBadge label={signal.value} tone={signal.tone} />
                 </div>
               </div>
             ))}
           </div>
         </SectionCard>
+      </section>
 
-        <SectionCard
-          eyebrow={t("overview.notes")}
-          title={t("overview.notes_title")}
-          description={t("overview.notes_desc")}
-        >
-          <div className="grid gap-3">
-            <div className="rounded-2xl border border-[rgba(100,116,139,0.14)] bg-[var(--admin-inner-bg)] px-4 py-4">
-              <p className="text-sm font-semibold text-[var(--color-text)]">{t("overview.storage_mode")}</p>
-              <p className="mt-1 text-sm leading-6 text-[var(--text-soft)]">{t("overview.storage_mode_desc")}</p>
+      <section className="grid gap-5 xl:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]">
+        <SectionCard title={t("overview.recent_snapshot")}>
+          <div className="overflow-hidden rounded-[20px] border border-[var(--admin-panel-border)] bg-[var(--admin-inner-bg)]">
+            <div className="hidden grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)_96px] gap-4 border-b border-[var(--admin-panel-border)] px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--text-faint)] md:grid">
+              <span>{t("overview.recent_snapshot")}</span>
+              <span>{t("overview.last_update")}</span>
+              <span className="text-right">{t("activity.file_size")}</span>
             </div>
-            <div className="rounded-2xl border border-[rgba(100,116,139,0.14)] bg-[var(--admin-inner-bg)] px-4 py-4">
-              <p className="text-sm font-semibold text-[var(--color-text)]">{t("overview.mask_geometry")}</p>
-              <p className="mt-1 text-sm leading-6 text-[var(--text-soft)]">
-                {t("overview.mask_geometry_desc").replace("{count}", String(overview.polygonPointCount))}
-              </p>
+
+            <div className="divide-y divide-[var(--admin-panel-border)]">
+              {overview.snapshotFiles.map((file) => (
+                <div
+                  key={file.label}
+                  className="grid gap-2 px-4 py-4 md:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)_96px] md:items-center md:gap-4"
+                >
+                  <div>
+                    <p className="text-sm font-semibold text-[var(--color-text)]">{file.label}</p>
+                    <p className="mt-1 text-sm text-[var(--text-soft)] md:hidden">
+                      {file.updatedAt ? formatRelativeDate(file.updatedAt, locale) : t("common.file_not_found")}
+                    </p>
+                  </div>
+                  <p className="hidden text-sm text-[var(--text-soft)] md:block">
+                    {file.updatedAt ? formatRelativeDate(file.updatedAt, locale) : t("common.file_not_found")}
+                  </p>
+                  <p className="text-sm font-medium text-[var(--text-soft)] md:text-right">
+                    {file.sizeKb ? `${file.sizeKb} KB` : t("common.no_size")}
+                  </p>
+                </div>
+              ))}
             </div>
-            <div className="rounded-2xl border border-[rgba(100,116,139,0.14)] bg-[var(--admin-inner-bg)] px-4 py-4">
-              <p className="text-sm font-semibold text-[var(--color-text)]">{t("overview.next_surface")}</p>
-              <p className="mt-1 text-sm leading-6 text-[var(--text-soft)]">{t("overview.next_surface_desc")}</p>
-            </div>
+          </div>
+        </SectionCard>
+
+        <SectionCard title={t("overview.notes")}>
+          <div className="grid gap-3 sm:grid-cols-3 xl:grid-cols-1">
+            {setupCards.map((card) => (
+              <div
+                key={card.label}
+                className="rounded-[18px] border border-[var(--admin-panel-border)] bg-[var(--admin-inner-bg)] px-4 py-4"
+              >
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--text-faint)]">
+                  {card.label}
+                </p>
+                <p className="mt-3 text-lg font-semibold text-[var(--color-text)]">{card.value}</p>
+                <p className="mt-1 text-sm text-[var(--text-soft)]">{card.caption}</p>
+              </div>
+            ))}
           </div>
         </SectionCard>
       </section>

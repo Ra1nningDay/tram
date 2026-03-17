@@ -66,9 +66,9 @@ export function AdminNetworkContent({ network }: { network: NetworkData }) {
       <section className="grid gap-4 xl:grid-cols-[360px_minmax(0,1fr)]">
         <SectionCard eyebrow={t("network.action_rail")} title={t("network.action_rail_title")} description={t("network.action_rail_desc")}>
           <div className="grid gap-4">
-            <QuickActionCard href="/editor?tab=route" title={t("network.route_geometry")} description={t("network.route_geometry_desc")} icon={<Waypoints size={20} />} badge={t("common.live")} tone="dark" />
-            <QuickActionCard href="/editor?tab=stops" title={t("network.stop_placement")} description={t("network.stop_placement_desc")} icon={<Map size={20} />} badge={t("common.live")} tone="accent" />
-            <QuickActionCard href="/editor?tab=mask" title={t("network.service_area_mask")} description={t("network.service_area_mask_desc")} icon={<Pentagon size={20} />} badge={t("common.live")} />
+            <QuickActionCard href="/editor?tab=route" title={t("network.route_geometry")} description={t("network.route_geometry_desc")} icon={<Waypoints size={20} />} tone="dark" />
+            <QuickActionCard href="/editor?tab=stops" title={t("network.stop_placement")} description={t("network.stop_placement_desc")} icon={<Map size={20} />} tone="accent" />
+            <QuickActionCard href="/editor?tab=mask" title={t("network.service_area_mask")} description={t("network.service_area_mask_desc")} icon={<Pentagon size={20} />} />
           </div>
         </SectionCard>
 

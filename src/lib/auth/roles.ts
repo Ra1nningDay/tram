@@ -3,6 +3,18 @@ import { getPrisma } from "@/lib/prisma";
 export const EDITOR_ROLE_KEY = "editor";
 export const ADMIN_ROLE_KEY = "admin";
 export const EDITOR_ACCESS_ROLE_KEYS = [ADMIN_ROLE_KEY, EDITOR_ROLE_KEY] as const;
+export const SYSTEM_ROLES = [
+  {
+    key: ADMIN_ROLE_KEY,
+    name: "Admin",
+    description: "Full dashboard access",
+  },
+  {
+    key: EDITOR_ROLE_KEY,
+    name: "Editor",
+    description: "Map editor access",
+  },
+] as const;
 
 type UserRoleKeyRecord = {
   role: {
@@ -65,4 +77,27 @@ export async function userCanAccessEditor(userId: string): Promise<boolean> {
 
 export async function userCanAccessAdmin(userId: string): Promise<boolean> {
   return userHasRole(userId, ADMIN_ROLE_KEY);
+}
+
+export async function ensureSystemRoles() {
+  const prisma = getPrisma();
+
+  return Promise.all(
+    SYSTEM_ROLES.map((role) =>
+      prisma.role.upsert({
+        where: {
+          key: role.key,
+        },
+        update: {
+          name: role.name,
+          description: role.description,
+        },
+        create: {
+          key: role.key,
+          name: role.name,
+          description: role.description,
+        },
+      })
+    )
+  );
 }

@@ -1,4 +1,4 @@
-import { ADMIN_ROLE_KEY, EDITOR_ROLE_KEY } from "@/lib/auth/roles";
+import { ADMIN_ROLE_KEY, EDITOR_ROLE_KEY, ensureSystemRoles } from "@/lib/auth/roles";
 import { getPrisma } from "@/lib/prisma";
 
 type AccessRoleSummary = {
@@ -68,6 +68,8 @@ export async function getAdminAccessData(): Promise<AdminAccessData> {
   try {
     const now = new Date();
     const prisma = getPrisma();
+
+    await ensureSystemRoles();
 
     const [roles, users]: [AccessRoleRecord[], AccessUserRecord[]] = await Promise.all([
       prisma.role.findMany({

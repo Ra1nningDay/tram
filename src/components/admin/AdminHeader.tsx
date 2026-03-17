@@ -17,14 +17,14 @@ type AdminHeaderProps = {
   };
 };
 
-const LOCALE_OPTIONS: { value: Locale; label: string; flag: string }[] = [
-  { value: "th", label: "ไทย", flag: "🇹🇭" },
-  { value: "en", label: "English", flag: "🇬🇧" },
+const LOCALE_OPTIONS: { value: Locale; label: string; short: string }[] = [
+  { value: "th", label: "\u0e44\u0e17\u0e22", short: "TH" },
+  { value: "en", label: "English", short: "EN" },
 ];
 
 const THEME_OPTIONS: { value: string; label: string; labelTh: string; Icon: typeof Sun }[] = [
-  { value: "light", label: "Light", labelTh: "สว่าง", Icon: Sun },
-  { value: "dark", label: "Dark", labelTh: "มืด", Icon: Moon },
+  { value: "light", label: "Light", labelTh: "\u0e2a\u0e27\u0e48\u0e32\u0e07", Icon: Sun },
+  { value: "dark", label: "Dark", labelTh: "\u0e21\u0e37\u0e14", Icon: Moon },
 ];
 
 export function AdminHeader({ user }: AdminHeaderProps) {
@@ -76,38 +76,36 @@ export function AdminHeader({ user }: AdminHeaderProps) {
   const activeTheme = mounted ? theme : "light";
 
   return (
-    <header className="admin-panel relative px-4 py-4 sm:px-5 sm:py-5 md:px-7">
-      <div className="pointer-events-none absolute inset-0 overflow-hidden">
-        <div className="absolute right-0 top-0 h-32 w-40 bg-[radial-gradient(circle,var(--admin-accent-glow),transparent_70%)] blur-2xl" />
-      </div>
-
-      <div className="relative flex flex-col gap-5 xl:flex-row xl:items-center xl:justify-between">
-        <div>
-          <h1 className="text-[2rem] font-semibold tracking-[-0.03em] text-[var(--color-text)] md:text-4xl">
+    <header className="admin-panel px-4 py-4 sm:px-5 md:px-6 lg:sticky lg:top-0 lg:z-20 lg:rounded-none lg:border-x-0 lg:border-t-0 lg:shadow-none">
+      <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+        <div className="min-w-0">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--text-faint)]">
+            {t("header.eyebrow")}
+          </p>
+          <h1 className="mt-1 text-[1.75rem] font-semibold tracking-[-0.03em] text-[var(--color-text)] md:text-[2rem]">
             {pageTitle}
           </h1>
         </div>
 
-        {/* User card + dropdown */}
         <div ref={rootRef} className="relative xl:flex-none">
           <button
             type="button"
             onClick={() => setOpen((prev) => !prev)}
             className={cn(
-              "flex min-w-0 items-center gap-3 rounded-[22px] border border-[var(--admin-panel-border)] bg-[linear-gradient(180deg,var(--glass-strong-bg),var(--glass-bg))] px-4 py-3 text-left transition-colors",
+              "flex min-w-0 items-center gap-3 rounded-[18px] border border-[var(--admin-panel-border)] bg-[var(--admin-inner-bg)] px-3.5 py-3 text-left transition-colors",
               "hover:border-[var(--admin-panel-border-strong)]",
               open && "border-[var(--admin-panel-border-strong)]"
             )}
             aria-haspopup="menu"
             aria-expanded={open}
           >
-            <span className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[var(--admin-icon-bg)] text-[var(--color-text)]">
+            <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[var(--admin-icon-bg)] text-[var(--color-text)]">
               <UserRound size={18} />
             </span>
             <span className="min-w-0">
               <span className="flex items-center gap-2 text-sm font-semibold text-[var(--color-text)]">
                 <span className="truncate">{displayName}</span>
-                <span className="rounded-full bg-[var(--admin-badge-success-bg)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--admin-badge-success-text)]">
+                <span className="rounded-full bg-[var(--admin-badge-success-bg)] px-2 py-0.5 text-[10px] font-medium text-[var(--admin-badge-success-text)]">
                   Admin
                 </span>
               </span>
@@ -128,12 +126,11 @@ export function AdminHeader({ user }: AdminHeaderProps) {
           {open && (
             <div
               role="menu"
-              className="absolute right-0 top-[calc(100%+0.5rem)] z-40 w-[260px] overflow-hidden rounded-2xl border border-[var(--admin-panel-border)] bg-[var(--glass-strong-bg)] p-2 shadow-2xl backdrop-blur-xl"
+              className="absolute right-0 top-[calc(100%+0.625rem)] z-40 w-[264px] overflow-hidden rounded-[20px] border border-[var(--admin-panel-border)] bg-[var(--glass-strong-bg)] p-2 shadow-[var(--admin-shadow-strong)] backdrop-blur-xl"
             >
-              {/* Language section */}
               <p className="px-2 pb-1 pt-1.5 text-[10px] font-semibold uppercase tracking-[0.2em] text-[var(--text-faint)]">
                 <Languages size={11} className="mr-1 inline-block" />
-                {locale === "th" ? "ภาษา" : "Language"}
+                {locale === "th" ? "\u0e20\u0e32\u0e29\u0e32" : "Language"}
               </p>
               <div className="mb-1.5 grid grid-cols-2 gap-1">
                 {LOCALE_OPTIONS.map((opt) => {
@@ -152,7 +149,9 @@ export function AdminHeader({ user }: AdminHeaderProps) {
                           : "text-[var(--color-text)] hover:bg-[var(--admin-nav-hover)]"
                       )}
                     >
-                      <span>{opt.flag}</span>
+                      <span className="inline-flex h-5 min-w-8 items-center justify-center rounded-full bg-[var(--admin-icon-bg)] px-1.5 text-[10px] font-semibold">
+                        {opt.short}
+                      </span>
                       <span>{opt.label}</span>
                     </button>
                   );
@@ -161,9 +160,8 @@ export function AdminHeader({ user }: AdminHeaderProps) {
 
               <hr className="border-[var(--admin-panel-border)]" />
 
-              {/* Theme section */}
               <p className="px-2 pb-1 pt-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-[var(--text-faint)]">
-                {locale === "th" ? "ธีม" : "Theme"}
+                {locale === "th" ? "\u0e18\u0e35\u0e21" : "Theme"}
               </p>
               <div className="mb-1.5 grid grid-cols-2 gap-1">
                 {THEME_OPTIONS.map((opt) => {
@@ -191,7 +189,6 @@ export function AdminHeader({ user }: AdminHeaderProps) {
 
               <hr className="border-[var(--admin-panel-border)]" />
 
-              {/* Logout */}
               <button
                 type="button"
                 onClick={handleLogout}
@@ -199,7 +196,13 @@ export function AdminHeader({ user }: AdminHeaderProps) {
                 className="mt-1.5 flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-sm font-medium text-red-400 transition-colors hover:bg-red-500/10 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 <LogOut size={15} />
-                <span>{isLoggingOut ? (locale === "th" ? "กำลังออก..." : "Signing out...") : t("common.logout")}</span>
+                <span>
+                  {isLoggingOut
+                    ? locale === "th"
+                      ? "\u0e01\u0e33\u0e25\u0e31\u0e07\u0e2d\u0e2d\u0e01..."
+                      : "Signing out..."
+                    : t("common.logout")}
+                </span>
               </button>
             </div>
           )}
