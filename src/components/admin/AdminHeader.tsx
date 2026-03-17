@@ -76,7 +76,7 @@ export function AdminHeader({ user }: AdminHeaderProps) {
   const activeTheme = mounted ? theme : "light";
 
   return (
-    <header className="admin-panel px-4 py-4 sm:px-5 md:px-6 lg:sticky lg:top-0 lg:z-20 lg:min-h-[120px] lg:rounded-none lg:border-0 lg:border-b lg:border-[var(--admin-panel-border)] lg:shadow-none xl:min-h-[124px]">
+    <header className="admin-panel px-4 py-4 sm:px-5 md:px-6 lg:sticky lg:top-0 lg:z-20 lg:min-h-[104px] lg:rounded-none lg:border-0 lg:border-b lg:border-[var(--admin-panel-border)] lg:px-5 lg:py-3.5 lg:shadow-none xl:min-h-[108px] xl:px-6 xl:py-4">
       <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
         <div className="min-w-0">
           <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--text-faint)]">
