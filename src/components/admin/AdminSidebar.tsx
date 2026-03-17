@@ -118,10 +118,10 @@ export function AdminSidebar() {
       : "Overview stays here. Editing opens in /editor.";
 
   return (
-    <aside className="relative shrink-0 lg:w-[288px] xl:w-[304px]">
+    <aside className="relative shrink-0 lg:border-r lg:border-[var(--admin-panel-border)]">
       <div
         data-admin-sidebar
-        className="admin-panel flex h-full flex-col p-4 sm:p-5 lg:sticky lg:top-0 lg:min-h-screen lg:rounded-none lg:border-b-0 lg:border-l-0 lg:shadow-none"
+        className="admin-panel flex h-full flex-col p-4 sm:p-5 lg:sticky lg:top-0 lg:min-h-screen lg:rounded-none lg:border-0 lg:shadow-none"
       >
         <div className="mb-5 flex items-center gap-3 border-b border-[var(--admin-panel-border)] pb-4">
           <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-[var(--admin-panel-border-strong)] bg-[var(--admin-accent-soft)] text-[var(--admin-accent-strong)]">
