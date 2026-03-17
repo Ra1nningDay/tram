@@ -121,9 +121,9 @@ export function AdminSidebar() {
     <aside className="relative shrink-0 lg:border-r lg:border-[var(--admin-panel-border)]">
       <div
         data-admin-sidebar
-        className="admin-panel flex h-full flex-col p-4 sm:p-5 lg:sticky lg:top-0 lg:min-h-screen lg:rounded-none lg:border-0 lg:shadow-none"
+        className="admin-panel flex h-full flex-col p-4 sm:p-5 lg:sticky lg:top-0 lg:min-h-screen lg:rounded-none lg:border-0 lg:px-0 lg:py-0 lg:shadow-none"
       >
-        <div className="mb-5 flex items-center gap-3 border-b border-[var(--admin-panel-border)] pb-4">
+        <div className="mb-5 flex items-center gap-3 border-b border-[var(--admin-panel-border)] pb-4 lg:mb-0 lg:min-h-[120px] lg:px-5 lg:py-5 lg:pb-5 xl:min-h-[124px] xl:px-6">
           <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-[var(--admin-panel-border-strong)] bg-[var(--admin-accent-soft)] text-[var(--admin-accent-strong)]">
             <LayoutDashboard size={20} />
           </div>
@@ -135,7 +135,7 @@ export function AdminSidebar() {
           </div>
         </div>
 
-        <section className="space-y-2">
+        <section className="space-y-2 lg:px-5 lg:pt-5 xl:px-6">
           <p className="px-1 text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--text-faint)]">
             {t("sidebar.control")}
           </p>
@@ -146,7 +146,7 @@ export function AdminSidebar() {
           </div>
         </section>
 
-        <section className="mt-5 space-y-2">
+        <section className="mt-5 space-y-2 lg:px-5 xl:px-6">
           <p className="px-1 text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--text-faint)]">
             {t("sidebar.tools")}
           </p>
@@ -157,7 +157,7 @@ export function AdminSidebar() {
           </div>
         </section>
 
-        <section className="mt-auto rounded-[20px] border border-[var(--admin-panel-border)] bg-[var(--admin-inner-bg)] p-4">
+        <section className="mt-auto rounded-[20px] border border-[var(--admin-panel-border)] bg-[var(--admin-inner-bg)] p-4 lg:mx-5 lg:mb-5 xl:mx-6">
           <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--text-faint)]">
             {t("sidebar.access_model")}
           </p>
