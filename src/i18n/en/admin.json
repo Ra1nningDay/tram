@@ -6,7 +6,7 @@
     "tools": "Tools",
     "overview": "Overview",
     "overview_desc": "Command view and quick actions",
-    "network": "Network",
+    "network": "Map",
     "network_desc": "Route, stops, and service area",
     "access": "Access",
     "access_desc": "Users and role memberships",
@@ -20,6 +20,7 @@
   "header": {
     "eyebrow": "Operations Desk",
     "title": "Admin Dashboard",
+    "map_title": "Map Management",
     "description": "Control access, inspect the current network state, and route into the editor without mixing operational UI into the map workspace."
   },
   "overview": {

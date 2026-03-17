@@ -33,7 +33,7 @@ export function AdminHeader({ user }: AdminHeaderProps) {
 
   const PAGE_TITLES: Record<string, string> = {
     "/admin": t("header.title"),
-    "/admin/network": t("sidebar.network"),
+    "/admin/network": t("header.map_title"),
     "/admin/access": t("sidebar.access"),
     "/admin/activity": t("sidebar.activity"),
   };
