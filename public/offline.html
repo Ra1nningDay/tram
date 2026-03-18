@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="th">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Offline | BU Tram Tracker</title>
+    <meta
+      name="description"
+      content="BU Tram Tracker is temporarily offline. Reconnect to continue tracking shuttles."
+    />
+    <style>
+      :root {
+        color-scheme: light dark;
+        --bg: #fff7f5;
+        --card: rgba(255, 255, 255, 0.88);
+        --text: #18202c;
+        --muted: #5d6675;
+        --accent: #fe5050;
+        --border: rgba(24, 32, 44, 0.08);
+      }
+
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #0f1218;
+          --card: rgba(24, 28, 37, 0.92);
+          --text: #f5f7fb;
+          --muted: #b7c0cf;
+          --border: rgba(255, 255, 255, 0.08);
+        }
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        padding: 24px;
+        font-family: "IBM Plex Sans Thai", "Segoe UI", sans-serif;
+        background:
+          radial-gradient(circle at top, rgba(254, 80, 80, 0.18), transparent 32%),
+          linear-gradient(180deg, rgba(254, 80, 80, 0.08), transparent 45%),
+          var(--bg);
+        color: var(--text);
+      }
+
+      main {
+        width: min(100%, 420px);
+        padding: 28px;
+        border: 1px solid var(--border);
+        border-radius: 28px;
+        background: var(--card);
+        backdrop-filter: blur(18px);
+        box-shadow: 0 24px 60px rgba(17, 17, 17, 0.12);
+      }
+
+      .icon {
+        width: 72px;
+        height: 72px;
+        border-radius: 24px;
+        display: grid;
+        place-items: center;
+        background: var(--accent);
+        color: white;
+        font-size: 28px;
+        font-weight: 700;
+      }
+
+      h1 {
+        margin: 20px 0 10px;
+        font-size: 1.7rem;
+      }
+
+      p {
+        margin: 0 0 12px;
+        color: var(--muted);
+        line-height: 1.6;
+      }
+
+      .actions {
+        margin-top: 24px;
+        display: flex;
+        gap: 12px;
+        flex-wrap: wrap;
+      }
+
+      a,
+      button {
+        appearance: none;
+        border: 0;
+        border-radius: 999px;
+        padding: 12px 18px;
+        font: inherit;
+        text-decoration: none;
+        cursor: pointer;
+      }
+
+      .primary {
+        background: var(--accent);
+        color: white;
+      }
+
+      .secondary {
+        background: transparent;
+        color: var(--text);
+        border: 1px solid var(--border);
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <div class="icon">BU</div>
+      <h1>No connection</h1>
+      <p>BU Tram Tracker is offline right now. Reconnect to resume live vehicle updates and map tiles.</p>
+      <p>If you opened the app before, some route and stop data may still load from cache after you retry.</p>
+      <div class="actions">
+        <button class="primary" type="button" onclick="window.location.reload()">Try again</button>
+        <a class="secondary" href="/">Back to app</a>
+      </div>
+    </main>
+  </body>
+</html>

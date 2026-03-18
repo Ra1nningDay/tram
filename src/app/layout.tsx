@@ -1,6 +1,8 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { IBM_Plex_Sans_Thai, Poppins } from "next/font/google";
 import type { ReactNode } from "react";
+
+import { PwaRegistrar } from "@/components/PwaRegistrar";
 
 import { AppProviders } from "./providers";
 import "./globals.css";
@@ -22,6 +24,36 @@ const ibmPlexSansThai = IBM_Plex_Sans_Thai({
 export const metadata: Metadata = {
   title: "BU Tram Tracker",
   description: "Public real-time shuttle tracking map for BU campus.",
+  applicationName: "BU Tram Tracker",
+  manifest: "/manifest.webmanifest",
+  keywords: ["tram", "bus", "tracker", "campus", "Bangkok University"],
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "BU Tram",
+  },
+  formatDetection: {
+    telephone: false,
+  },
+  icons: {
+    icon: [
+      { url: "/icon-192x192.png", sizes: "192x192", type: "image/png" },
+      { url: "/icon-512x512.png", sizes: "512x512", type: "image/png" },
+    ],
+    apple: [{ url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
+    shortcut: ["/icon-192x192.png"],
+  },
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#fe5050" },
+    { media: "(prefers-color-scheme: dark)", color: "#111111" },
+  ],
+  colorScheme: "light dark",
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
@@ -32,6 +64,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       className={`${poppins.variable} ${ibmPlexSansThai.variable}`}
     >
       <body>
+        <PwaRegistrar />
         <AppProviders>{children}</AppProviders>
       </body>
     </html>
