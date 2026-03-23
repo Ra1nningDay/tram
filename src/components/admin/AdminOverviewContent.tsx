@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowRight, DatabaseZap, Map, Pentagon, Route, ShieldCheck } from "lucide-react";
+import { ArrowRight, Bus, DatabaseZap, Map, Pentagon, Route, ShieldCheck, Users } from "lucide-react";
 import Link from "next/link";
 
 import { useAdminLocale } from "@/components/admin/LocaleProvider";
@@ -13,6 +13,11 @@ type OverviewData = {
   routeCount: number;
   stopCount: number;
   roleCount: number;
+  onlineUserCount: number;
+  activeSessionCount: number;
+  activeDriverCount: number;
+  totalVehicleCount: number;
+  lastVehicleUpdateAt: Date | null;
   lastUpdatedAt: Date | null;
   authEnabled: boolean;
   editorProtected: boolean;
@@ -27,6 +32,13 @@ function formatRelativeDate(date: Date | null, locale: string) {
     dateStyle: "medium",
     timeStyle: "short",
   }).format(date);
+}
+
+function formatCopy(template: string, values: Record<string, string>) {
+  return Object.entries(values).reduce(
+    (resolved, [key, value]) => resolved.replace(`{${key}}`, value),
+    template
+  );
 }
 
 export function AdminOverviewContent({ overview }: { overview: OverviewData }) {
@@ -57,6 +69,38 @@ export function AdminOverviewContent({ overview }: { overview: OverviewData }) {
       value: formatRelativeDate(overview.lastUpdatedAt, locale) ?? t("common.no_file_timestamp"),
       hint: t("common.verified"),
       icon: <DatabaseZap size={18} />,
+    },
+  ];
+  const liveMetrics = [
+    {
+      label: t("overview.database"),
+      value: overview.databaseConnected ? t("common.connected") : t("common.degraded"),
+      hint: t(
+        overview.databaseConnected
+          ? "overview.database_live_hint"
+          : "overview.database_live_hint_degraded"
+      ),
+      accent: "amber" as const,
+      icon: <DatabaseZap size={18} />,
+    },
+    {
+      label: t("overview.online_users"),
+      value: String(overview.onlineUserCount),
+      hint: overview.databaseConnected
+        ? formatCopy(t("overview.online_users_hint"), {
+            count: String(overview.activeSessionCount),
+          })
+        : t("overview.online_users_hint_no_db"),
+      icon: <Users size={18} />,
+    },
+    {
+      label: t("overview.active_drivers"),
+      value: String(overview.activeDriverCount),
+      hint: formatCopy(t("overview.active_drivers_hint"), {
+        active: String(overview.activeDriverCount),
+        total: String(overview.totalVehicleCount),
+      }),
+      icon: <Bus size={18} />,
     },
   ];
 
@@ -114,6 +158,28 @@ export function AdminOverviewContent({ overview }: { overview: OverviewData }) {
         ))}
       </section>
 
+      <SectionCard title={t("overview.live_operations")} description={t("overview.live_operations_desc")}>
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          {liveMetrics.map((metric) => (
+            <MetricCard
+              key={metric.label}
+              label={metric.label}
+              value={metric.value}
+              hint={metric.hint}
+              accent={metric.accent}
+              icon={metric.icon}
+            />
+          ))}
+        </div>
+        {overview.lastVehicleUpdateAt ? (
+          <p className="mt-4 text-sm text-[var(--text-soft)]">
+            {formatCopy(t("overview.last_driver_signal"), {
+              date: formatRelativeDate(overview.lastVehicleUpdateAt, locale) ?? t("common.no_timestamp"),
+            })}
+          </p>
+        ) : null}
+      </SectionCard>
+
       <section className="grid gap-5 xl:grid-cols-[minmax(0,1.45fr)_minmax(320px,0.9fr)]">
         <SectionCard
           title={t("overview.quick_actions")}
@@ -156,7 +222,6 @@ export function AdminOverviewContent({ overview }: { overview: OverviewData }) {
             />
           </div>
         </SectionCard>
-
         <SectionCard title={t("overview.system_status")} className="h-full">
           <div className="grid gap-3">
             {systemSignals.map((signal) => (

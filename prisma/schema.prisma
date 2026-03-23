@@ -96,3 +96,58 @@ model UserRole {
   @@index([roleId])
   @@map("user_roles")
 }
+
+// ── Shuttle Network ─────────────────────────────────────────────────
+
+model ShuttleRoute {
+  id         String           @id @default(cuid())
+  name       String
+  createdAt  DateTime         @default(now())
+  updatedAt  DateTime         @updatedAt
+  directions RouteDirection[]
+
+  @@map("shuttle_routes")
+}
+
+model RouteDirection {
+  id             String       @id @default(cuid())
+  routeId        String
+  direction      String       @default("outbound")
+  coordinates    Json         // [[lng, lat], ...]
+  stopReferences Json         @default("[]") // [{id, sequence}, ...]
+  route          ShuttleRoute @relation(fields: [routeId], references: [id], onDelete: Cascade)
+
+  @@index([routeId])
+  @@map("route_directions")
+}
+
+model Stop {
+  id        String   @id
+  nameTh    String
+  nameEn    String?
+  latitude  Float
+  longitude Float
+  sequence  Int
+  direction String   @default("outbound")
+  icon      String?
+  color     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("stops")
+}
+
+model MapConfig {
+  id             String   @id @default("default")
+  polygon        Json     // [[lng, lat], ...]
+  mapStyle       String   @default("basic")
+  initialZoom    Float    @default(15)
+  minZoom        Float    @default(13.5)
+  maxZoom        Float    @default(18)
+  maskOpacity    Float    @default(0.85)
+  maskColor      String   @default("#1e2127")
+  initialBearing Float    @default(-90)
+  updatedAt      DateTime @updatedAt
+
+  @@map("map_config")
+}

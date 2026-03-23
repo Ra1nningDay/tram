@@ -77,7 +77,7 @@ export function AdminHeader({ user, onMenuClick }: AdminHeaderProps) {
   const activeTheme = mounted ? theme : "light";
 
   return (
-    <header className="admin-panel px-4 py-4 sm:px-5 md:px-6 lg:sticky lg:top-0 lg:z-20 lg:min-h-[104px] lg:rounded-none lg:border-0 lg:border-b lg:border-[var(--admin-panel-border)] lg:px-5 lg:py-3.5 lg:shadow-none xl:min-h-[108px] xl:px-6 xl:py-4">
+    <header className="admin-panel rounded-none border-0 border-b border-[var(--admin-panel-border)] px-4 py-4 sm:px-5 md:px-6 lg:sticky lg:top-0 lg:z-20 lg:min-h-[104px] lg:px-5 lg:py-3.5 lg:shadow-none xl:min-h-[108px] xl:px-6 xl:py-4">
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-3 min-w-0">
           {/* Hamburger — mobile only */}

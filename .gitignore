@@ -122,6 +122,7 @@ dist-ssr
 *.local
 package-lock.json
 .twa/
+.codex-artifacts/
 *.jks
 *.keystore
 play-service-account*.json

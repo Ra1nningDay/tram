@@ -5,6 +5,8 @@ import type { ReactNode } from "react";
 import { PwaRegistrar } from "@/components/PwaRegistrar";
 import { getMetadataBase } from "@/lib/config";
 
+import { Analytics } from "@vercel/analytics/react";
+
 import { AppProviders } from "./providers";
 import "./globals.css";
 
@@ -68,6 +70,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       <body>
         <PwaRegistrar />
         <AppProviders>{children}</AppProviders>
+        <Analytics />
       </body>
     </html>
   );

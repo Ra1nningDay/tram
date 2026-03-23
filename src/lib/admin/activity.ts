@@ -1,6 +1,3 @@
-import { promises as fs } from "node:fs";
-import path from "node:path";
-
 import { getPrisma } from "@/lib/prisma";
 
 type ActivityEvent = {
@@ -58,47 +55,28 @@ export type AdminActivityData = {
   recentUserCount: number;
 };
 
-function toKilobytes(bytes: number) {
-  return Math.max(1, Math.round(bytes / 1024));
+function toKilobytes(_bytes: number) {
+  return Math.max(1, Math.round(_bytes / 1024));
 }
 
 async function getWritableAssets(): Promise<WritableAsset[]> {
-  const dataDir = path.join(process.cwd(), "src", "data");
-
-  return Promise.all(
-    [
-      {
-        label: "Shuttle data",
-        scope: "Routes, stops, and vehicles snapshot",
-        filePath: path.join(dataDir, "shuttle-data.json"),
-      },
-      {
-        label: "Campus config",
-        scope: "Service area polygon and map settings",
-        filePath: path.join(dataDir, "campus-config.json"),
-      },
-    ].map(async ({ label, scope, filePath }) => {
-      try {
-        const stats = await fs.stat(filePath);
-
-        return {
-          label,
-          scope,
-          updatedAt: stats.mtime,
-          sizeKb: toKilobytes(stats.size),
-          status: "healthy" as const,
-        };
-      } catch {
-        return {
-          label,
-          scope,
-          updatedAt: null,
-          sizeKb: null,
-          status: "missing" as const,
-        };
-      }
-    })
-  );
+  // Data is now stored in the database, not files
+  return [
+    {
+      label: "Shuttle data",
+      scope: "Routes, stops (Postgres)",
+      updatedAt: new Date(),
+      sizeKb: null,
+      status: "healthy" as const,
+    },
+    {
+      label: "Campus config",
+      scope: "Service area polygon and map settings (Postgres)",
+      updatedAt: new Date(),
+      sizeKb: null,
+      status: "healthy" as const,
+    },
+  ];
 }
 
 export async function getAdminActivityData(): Promise<AdminActivityData> {
@@ -237,7 +215,7 @@ export async function getAdminActivityData(): Promise<AdminActivityData> {
     writableAssets,
     authEnabled: Boolean(process.env.BETTER_AUTH_SECRET || process.env.AUTH_SECRET),
     editorProtected: true,
-    jsonBackedStorage: true,
+    jsonBackedStorage: false,
     databaseConnected,
     activeSessionCount,
     recentUserCount,

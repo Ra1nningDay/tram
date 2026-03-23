@@ -151,7 +151,7 @@ export function AdminSidebar({ open, onClose }: AdminSidebarProps) {
   const sidebarContent = (
     <div
       data-admin-sidebar
-      className="admin-panel flex h-full flex-col p-4 sm:p-5 lg:sticky lg:top-0 lg:min-h-screen lg:rounded-none lg:border-0 lg:px-0 lg:py-0 lg:shadow-none"
+      className="admin-panel rounded-none border-0 flex h-full lg:h-screen flex-col p-4 sm:p-5 lg:sticky lg:top-0 lg:overflow-y-auto lg:px-0 lg:py-0 lg:shadow-none shrink-0"
     >
       <div className="mb-5 flex items-center gap-3 border-b border-[var(--admin-panel-border)] pb-4 lg:mb-0 lg:min-h-[104px] lg:px-5 lg:py-4 lg:pb-4 xl:min-h-[108px] xl:px-6">
         <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-[var(--admin-panel-border-strong)] bg-[var(--admin-accent-soft)] text-[var(--admin-accent-strong)]">

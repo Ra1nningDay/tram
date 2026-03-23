@@ -242,9 +242,9 @@ export function DriverDemoScreen() {
         {isModalOpen && (
           <div className="absolute inset-0 z-50 flex items-end justify-center p-0 lg:items-center">
             {/* Backdrop */}
-            <button 
+            <button
               type="button"
-              className="absolute inset-0 h-full w-full cursor-default bg-black/60 backdrop-blur-sm focus:outline-none" 
+              className="absolute inset-0 h-full w-full cursor-default bg-black/60 backdrop-blur-sm focus:outline-none"
               onClick={() => setIsModalOpen(false)}
               aria-label="Close modal background"
             />
@@ -274,8 +274,8 @@ export function DriverDemoScreen() {
                       }}
                       className={cn(
                         "group mb-2 flex w-full items-center justify-between rounded-[20px] p-4 text-left transition focus:outline-none",
-                        isSelected 
-                          ? "bg-[#4ade80]/15" 
+                        isSelected
+                          ? "bg-[#4ade80]/15"
                           : "bg-white/[0.03] hover:bg-white/10"
                       )}
                     >
@@ -336,7 +336,7 @@ export function DriverDemoScreen() {
                 </div>
               </header>
 
-              <div className="flex flex-1 flex-col px-5 pb-0 pt-0">
+              <div className="border-t border-white/10 px-5 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
                 <div
                   className="inline-flex h-7 items-center gap-1.5 self-start rounded-full border border-white/20 bg-transparent px-3 text-[12px] font-medium text-white/90"
                   aria-live="polite"
@@ -344,7 +344,9 @@ export function DriverDemoScreen() {
                   <Clock3 className="h-4 w-4" />
                   {elapsedLabel}
                 </div>
+              </div>
 
+              <div className="flex flex-1 flex-col px-5 pb-0 pt-6">
                 <div className="mt-8 flex flex-col items-center">
                   <button
                     type="button"
@@ -375,8 +377,8 @@ export function DriverDemoScreen() {
 
                 <div className="mt-6 w-full">
                   <div className="flex items-center justify-center space-x-2">
-                    <button 
-                      type="button" 
+                    <button
+                      type="button"
                       onClick={() => setIsModalOpen(true)}
                       className="inline-flex items-center gap-1.5 rounded-[12px] border border-white/15 bg-white/5 px-3 py-1.5 text-[12px] font-semibold text-white transition hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-white/20"
                     >

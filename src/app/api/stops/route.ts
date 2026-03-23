@@ -1,14 +1,23 @@
 import { NextResponse } from "next/server";
-import shuttleData from "../../../data/shuttle-data.json";
+import { getShuttleData } from "@/lib/data/shuttle-data";
 
 export async function GET() {
-    const stops = shuttleData.stops.map((stop) => ({
-        ...stop,
-        direction: stop.direction as "outbound" | "inbound",
-    }));
+  const data = await getShuttleData();
 
-    return NextResponse.json({
-        server_time: new Date().toISOString(),
-        stops,
-    });
+  const stops = data.stops.map((s) => ({
+    id: s.id,
+    name_th: s.nameTh,
+    name_en: s.nameEn,
+    latitude: s.latitude,
+    longitude: s.longitude,
+    sequence: s.sequence,
+    direction: s.direction as "outbound" | "inbound",
+    icon: s.icon,
+    color: s.color,
+  }));
+
+  return NextResponse.json({
+    server_time: new Date().toISOString(),
+    stops,
+  });
 }

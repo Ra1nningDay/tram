@@ -64,7 +64,7 @@ export function RouteEditorPage() {
     initialTabParam === "stops" || initialTabParam === "mask" ? initialTabParam : "route";
   const [activeTab, setActiveTab] = useState<EditorTab>(initialTab);
   const [panelOpen, setPanelOpen] = useState(true);
-  const { setTheme } = useTheme();
+  const { theme, setTheme } = useTheme();
   const drawingEditor = useDrawingEditor();
   const stopEditor = useStopEditor();
 
@@ -96,10 +96,26 @@ export function RouteEditorPage() {
     };
   }, []);
 
-  // Force light theme on the editor page
+  // We use a ref to capture the initial theme when the component first mounts.
+  const originalThemeRef = useRef<string | undefined>(undefined);
+
+  // Capture the initial theme on mount, and restore it on unmount.
   useEffect(() => {
+    // Only set the original theme once to avoid overwriting it if theme changes while mounted.
+    if (originalThemeRef.current === undefined) {
+      originalThemeRef.current = theme;
+    }
+
     setTheme("light");
-  }, [setTheme]);
+
+    return () => {
+      // When unmounting, if we had an original theme and it's not light, restore it.
+      if (originalThemeRef.current && originalThemeRef.current !== "light") {
+        setTheme(originalThemeRef.current);
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleTabChange = useCallback(
     (newTab: EditorTab) => {
