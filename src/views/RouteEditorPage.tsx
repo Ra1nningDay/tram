@@ -1,12 +1,11 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { useTheme } from "next-themes";
 import { DrawingEditorControls, useDrawingEditor } from "../components/DrawingEditor";
 import { DrawingEditorMap } from "../features/map/DrawingEditorMap";
 import { StopEditorControls, useStopEditor } from "../components/StopEditor";
 import { StopEditorMap } from "../features/map/StopEditorMap";
-import { Route, MapPin, Pentagon, Check } from "lucide-react";
-import { LogoutButton } from "../components/auth/LogoutButton";
-import { ThemeToggle } from "../components/ThemeToggle";
+import { Route, MapPin, Pentagon, Check, PanelBottomClose, PanelBottomOpen } from "lucide-react";
 import shuttleData from "../data/shuttle-data.json";
 import campusConfig from "../data/campus-config.json";
 
@@ -64,6 +63,8 @@ export function RouteEditorPage() {
   const initialTab: EditorTab =
     initialTabParam === "stops" || initialTabParam === "mask" ? initialTabParam : "route";
   const [activeTab, setActiveTab] = useState<EditorTab>(initialTab);
+  const [panelOpen, setPanelOpen] = useState(true);
+  const { setTheme } = useTheme();
   const drawingEditor = useDrawingEditor();
   const stopEditor = useStopEditor();
 
@@ -94,6 +95,11 @@ export function RouteEditorPage() {
       }
     };
   }, []);
+
+  // Force light theme on the editor page
+  useEffect(() => {
+    setTheme("light");
+  }, [setTheme]);
 
   const handleTabChange = useCallback(
     (newTab: EditorTab) => {
@@ -265,11 +271,12 @@ export function RouteEditorPage() {
         )}
       </div>
 
-      <div className="absolute left-4 top-4 z-10">
+      {/* Top bar: tabs (left) + theme/logout (right) */}
+      <div className="absolute left-3 right-3 top-3 z-20 flex items-start justify-between gap-2 sm:left-4 sm:right-4 sm:top-4">
         <div className="glass-card flex gap-1 p-1">
           <button
             onClick={() => handleTabChange("route")}
-            className={`flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+            className={`flex items-center gap-1.5 rounded-lg px-2.5 py-2 text-sm font-medium transition-colors sm:px-3 ${
               activeTab === "route"
                 ? "bg-red-500 text-white"
                 : "text-[var(--color-text)] hover:bg-[var(--color-surface-lighter)]"
@@ -280,7 +287,7 @@ export function RouteEditorPage() {
           </button>
           <button
             onClick={() => handleTabChange("stops")}
-            className={`flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+            className={`flex items-center gap-1.5 rounded-lg px-2.5 py-2 text-sm font-medium transition-colors sm:px-3 ${
               activeTab === "stops"
                 ? "bg-blue-500 text-white"
                 : "text-[var(--color-text)] hover:bg-[var(--color-surface-lighter)]"
@@ -291,7 +298,7 @@ export function RouteEditorPage() {
           </button>
           <button
             onClick={() => handleTabChange("mask")}
-            className={`flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+            className={`flex items-center gap-1.5 rounded-lg px-2.5 py-2 text-sm font-medium transition-colors sm:px-3 ${
               activeTab === "mask"
                 ? "bg-purple-500 text-white"
                 : "text-[var(--color-text)] hover:bg-[var(--color-surface-lighter)]"
@@ -303,39 +310,49 @@ export function RouteEditorPage() {
         </div>
       </div>
 
-      <div className="absolute right-4 top-20 z-20 flex gap-2 md:right-[272px] md:top-4">
-        <ThemeToggle />
-        <LogoutButton />
-      </div>
+      {/* Editor controls panel — bottom-left, above status bar */}
+      <div className="absolute bottom-14 left-3 z-10 w-[min(280px,calc(100vw-24px))] sm:left-4 sm:w-[260px]">
+        {/* Toggle button */}
+        <button
+          type="button"
+          onClick={() => setPanelOpen((prev) => !prev)}
+          className="mb-2 inline-flex items-center gap-1.5 rounded-xl bg-[var(--glass-strong-bg)] px-3 py-2 text-xs font-semibold text-[var(--color-text)] shadow-md backdrop-blur-md transition-colors hover:bg-[var(--color-surface-lighter)]"
+          style={{ border: '1px solid var(--glass-border)' }}
+        >
+          {panelOpen ? <PanelBottomClose className="h-3.5 w-3.5" /> : <PanelBottomOpen className="h-3.5 w-3.5" />}
+          <span>{panelOpen ? "ซ่อน" : "แสดงเครื่องมือ"}</span>
+        </button>
 
-      <div className="absolute right-4 top-4 z-10">
-        {activeTab === "stops" ? (
-          <StopEditorControls
-            isPlacing={stopEditor.isPlacing}
-            stops={stopEditor.stops}
-            editingIndex={stopEditor.editingIndex}
-            onTogglePlacing={stopEditor.togglePlacing}
-            onClear={stopEditor.clear}
-            onUndo={stopEditor.undo}
-            onExport={handleStopsExport}
-            onEditStop={stopEditor.editStop}
-            onUpdateStopName={stopEditor.updateStopName}
-          />
-        ) : (
-          <DrawingEditorControls
-            mode={activeTab === "mask" ? "polygon" : "route"}
-            isDrawing={drawingEditor.isDrawing}
-            points={drawingEditor.points}
-            onToggleDrawing={drawingEditor.toggleDrawing}
-            onClear={drawingEditor.clear}
-            onUndo={drawingEditor.undo}
-            onExport={handleDrawingExport}
-          />
+        {panelOpen && (
+          activeTab === "stops" ? (
+            <StopEditorControls
+              isPlacing={stopEditor.isPlacing}
+              stops={stopEditor.stops}
+              editingIndex={stopEditor.editingIndex}
+              onTogglePlacing={stopEditor.togglePlacing}
+              onClear={stopEditor.clear}
+              onUndo={stopEditor.undo}
+              onExport={handleStopsExport}
+              onEditStop={stopEditor.editStop}
+              onUpdateStopName={stopEditor.updateStopName}
+            />
+          ) : (
+            <DrawingEditorControls
+              mode={activeTab === "mask" ? "polygon" : "route"}
+              isDrawing={drawingEditor.isDrawing}
+              points={drawingEditor.points}
+              onToggleDrawing={drawingEditor.toggleDrawing}
+              onClear={drawingEditor.clear}
+              onUndo={drawingEditor.undo}
+              onExport={handleDrawingExport}
+            />
+          )
         )}
       </div>
 
-      <div className="glass-card absolute bottom-4 left-1/2 z-10 -translate-x-1/2 px-4 py-2">
-        <p className="text-sm text-[var(--color-text-muted)]">
+      {/* Status hint — bottom center */}
+      <div className="glass-card absolute bottom-3 left-1/2 z-10 -translate-x-1/2 whitespace-nowrap px-3 py-1.5 sm:bottom-4 sm:px-4 sm:py-2">
+        <p className="text-xs text-[var(--color-text-muted)] sm:text-sm">
           {activeTab === "stops"
             ? stopEditor.isPlacing
               ? "Click map to place stops"

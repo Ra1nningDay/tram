@@ -1,4 +1,4 @@
-import { config } from "../../lib/config";
+import { resolveApiUrl } from "../../lib/config";
 
 export type Status = "fresh" | "delayed" | "offline" | "hidden";
 
@@ -46,7 +46,7 @@ export type Eta = {
 };
 
 async function request<T>(path: string): Promise<T> {
-  const res = await fetch(`${config.apiBaseUrl}${path}`);
+  const res = await fetch(resolveApiUrl(path));
   if (!res.ok) {
     throw new Error(`Request failed: ${res.status}`);
   }

@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronDown, Languages, LogOut, Moon, ShieldCheck, Sun, UserRound } from "lucide-react";
+import { ChevronDown, Languages, LogOut, Menu, Moon, ShieldCheck, Sun, UserRound } from "lucide-react";
 import { useTheme } from "next-themes";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
@@ -15,6 +15,7 @@ type AdminHeaderProps = {
     name?: string | null;
     email?: string | null;
   };
+  onMenuClick?: () => void;
 };
 
 const LOCALE_OPTIONS: { value: Locale; label: string; short: string }[] = [
@@ -27,7 +28,7 @@ const THEME_OPTIONS: { value: string; label: string; labelTh: string; Icon: type
   { value: "dark", label: "Dark", labelTh: "\u0e21\u0e37\u0e14", Icon: Moon },
 ];
 
-export function AdminHeader({ user }: AdminHeaderProps) {
+export function AdminHeader({ user, onMenuClick }: AdminHeaderProps) {
   const { t, locale, setLocale } = useAdminLocale();
   const pathname = usePathname();
 
@@ -77,17 +78,28 @@ export function AdminHeader({ user }: AdminHeaderProps) {
 
   return (
     <header className="admin-panel px-4 py-4 sm:px-5 md:px-6 lg:sticky lg:top-0 lg:z-20 lg:min-h-[104px] lg:rounded-none lg:border-0 lg:border-b lg:border-[var(--admin-panel-border)] lg:px-5 lg:py-3.5 lg:shadow-none xl:min-h-[108px] xl:px-6 xl:py-4">
-      <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-        <div className="min-w-0">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--text-faint)]">
-            {t("header.eyebrow")}
-          </p>
-          <h1 className="mt-1 text-[1.75rem] font-semibold tracking-[-0.03em] text-[var(--color-text)] md:text-[2rem]">
-            {pageTitle}
-          </h1>
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3 min-w-0">
+          {/* Hamburger — mobile only */}
+          <button
+            type="button"
+            onClick={onMenuClick}
+            className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[var(--admin-panel-border)] bg-[var(--admin-inner-bg)] text-[var(--text-soft)] transition-colors hover:border-[var(--admin-panel-border-strong)] hover:text-[var(--color-text)] lg:hidden"
+            aria-label="Open sidebar"
+          >
+            <Menu size={18} />
+          </button>
+          <div className="min-w-0">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--text-faint)] hidden sm:block">
+              {t("header.eyebrow")}
+            </p>
+            <h1 className="text-lg font-semibold tracking-[-0.03em] text-[var(--color-text)] sm:text-[1.75rem] md:text-[2rem] sm:mt-1">
+              {pageTitle}
+            </h1>
+          </div>
         </div>
 
-        <div ref={rootRef} className="relative xl:flex-none">
+        <div ref={rootRef} className="relative shrink-0">
           <button
             type="button"
             onClick={() => setOpen((prev) => !prev)}
@@ -99,10 +111,10 @@ export function AdminHeader({ user }: AdminHeaderProps) {
             aria-haspopup="menu"
             aria-expanded={open}
           >
-            <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[var(--admin-icon-bg)] text-[var(--color-text)]">
+            <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[var(--admin-icon-bg)] text-[var(--color-text)] sm:h-10 sm:w-10 sm:rounded-2xl">
               <UserRound size={18} />
             </span>
-            <span className="min-w-0">
+            <span className="hidden min-w-0 sm:block">
               <span className="flex items-center gap-2 text-sm font-semibold text-[var(--color-text)]">
                 <span className="truncate">{displayName}</span>
                 <span className="rounded-full bg-[var(--admin-badge-success-bg)] px-2 py-0.5 text-[10px] font-medium text-[var(--admin-badge-success-text)]">

@@ -41,7 +41,7 @@ export function AdminNetworkContent({ network }: { network: NetworkData }) {
 
   return (
     <div className="space-y-4">
-      <section className="grid gap-4 lg:grid-cols-3">
+      <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <MetricCard
           label={t("network.route_summary")}
           value={`${network.routeCount} / ${network.directionCount}`}
@@ -63,7 +63,7 @@ export function AdminNetworkContent({ network }: { network: NetworkData }) {
         />
       </section>
 
-      <section className="grid gap-4 xl:grid-cols-[360px_minmax(0,1fr)]">
+      <section className="grid gap-4 lg:grid-cols-[360px_minmax(0,1fr)]">
         <SectionCard eyebrow={t("network.action_rail")} title={t("network.action_rail_title")} description={t("network.action_rail_desc")}>
           <div className="grid gap-4">
             <QuickActionCard href="/editor?tab=route" title={t("network.route_geometry")} description={t("network.route_geometry_desc")} icon={<Waypoints size={20} />} tone="dark" />
@@ -86,7 +86,7 @@ export function AdminNetworkContent({ network }: { network: NetworkData }) {
             </Link>
           }
         >
-          <div className="grid gap-4 lg:grid-cols-3">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             <article className="rounded-[24px] border border-[rgba(100,116,139,0.14)] bg-[var(--admin-inner-bg)] p-5">
               <div className="flex items-center justify-between gap-3">
                 <div>

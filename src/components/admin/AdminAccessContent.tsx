@@ -402,7 +402,77 @@ export function AdminAccessContent({ access }: { access: AccessData }) {
 
             <div className="overflow-hidden rounded-[20px] border border-[var(--admin-panel-border)] bg-[var(--admin-inner-bg)]">
               {filteredUsers.length > 0 ? (
-                <div className="overflow-x-auto">
+                <>
+                  {/* Mobile card layout */}
+                  <div className="divide-y divide-[var(--admin-panel-border)] lg:hidden">
+                    {filteredUsers.map((user) => {
+                      const adminActive = user.roleKeys.includes(ADMIN_ROLE_KEY);
+                      const editorActive = user.roleKeys.includes(EDITOR_ROLE_KEY);
+                      const adminPending = pendingKey === `${user.id}:${ADMIN_ROLE_KEY}`;
+                      const editorPending = pendingKey === `${user.id}:${EDITOR_ROLE_KEY}`;
+
+                      return (
+                        <div key={user.id} className="space-y-3 p-4">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <p className="text-sm font-semibold text-[var(--color-text)]">
+                              {user.name || copy.unknownUser}
+                            </p>
+                            <StatusBadge
+                              label={user.emailVerified ? t("common.verified") : t("common.unverified")}
+                              tone={user.emailVerified ? "success" : "warning"}
+                            />
+                          </div>
+                          <p className="text-sm text-[var(--text-soft)]">{user.email}</p>
+
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="text-xs font-semibold uppercase tracking-wider text-[var(--text-faint)]">{copy.rolesCol}:</span>
+                            {user.roleKeys.length > 0 ? (
+                              user.roleKeys.map((roleKey) => (
+                                <StatusBadge
+                                  key={`${user.id}-${roleKey}`}
+                                  label={roleKey}
+                                  tone={roleKey === ADMIN_ROLE_KEY || roleKey === EDITOR_ROLE_KEY ? "success" : "neutral"}
+                                />
+                              ))
+                            ) : (
+                              <span className="text-sm text-[var(--text-soft)]">{copy.noRole}</span>
+                            )}
+                          </div>
+
+                          <div className="flex flex-wrap items-center gap-2">
+                            <StatusBadge
+                              label={user.hasAdminAccess ? t("common.admin_access") : t("common.no_admin")}
+                              tone={user.hasAdminAccess ? "success" : "neutral"}
+                            />
+                            <StatusBadge
+                              label={user.hasEditorAccess ? t("common.editor_access") : t("common.no_editor")}
+                              tone={user.hasEditorAccess ? "success" : "warning"}
+                            />
+                          </div>
+
+                          <div className="flex flex-wrap gap-2">
+                            <ManageRoleButton
+                              label="Admin"
+                              active={adminActive}
+                              disabled={adminPending || editorPending}
+                              pending={adminPending}
+                              onClick={() => handleRoleUpdate(user.id, ADMIN_ROLE_KEY, !adminActive)}
+                            />
+                            <ManageRoleButton
+                              label="Editor"
+                              active={editorActive}
+                              disabled={adminPending || editorPending}
+                              pending={editorPending}
+                              onClick={() => handleRoleUpdate(user.id, EDITOR_ROLE_KEY, !editorActive)}
+                            />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Desktop table layout */}
+                  <div className="hidden overflow-x-auto lg:block">
                   <table className="w-full min-w-[1120px] border-collapse">
                     <thead className="bg-[var(--admin-panel-muted)]">
                       <tr className="border-b border-[var(--admin-panel-border)] text-left">
@@ -524,6 +594,7 @@ export function AdminAccessContent({ access }: { access: AccessData }) {
                     </tbody>
                   </table>
                 </div>
+                </>
               ) : (
                 <div className="p-6 text-sm text-[var(--text-soft)]">
                   {accessState.users.length > 0 ? copy.noResults : copy.noUsers}

@@ -2,12 +2,14 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
+    id: "/",
     name: "BU Tram Tracker",
     short_name: "BU Tram",
     description: "Public real-time shuttle tracking map for BU campus.",
     start_url: "/",
     scope: "/",
     display: "standalone",
+    orientation: "any",
     background_color: "#111111",
     theme_color: "#fe5050",
     lang: "th",

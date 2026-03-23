@@ -3,6 +3,7 @@ import { IBM_Plex_Sans_Thai, Poppins } from "next/font/google";
 import type { ReactNode } from "react";
 
 import { PwaRegistrar } from "@/components/PwaRegistrar";
+import { getMetadataBase } from "@/lib/config";
 
 import { AppProviders } from "./providers";
 import "./globals.css";
@@ -25,6 +26,7 @@ export const metadata: Metadata = {
   title: "BU Tram Tracker",
   description: "Public real-time shuttle tracking map for BU campus.",
   applicationName: "BU Tram Tracker",
+  metadataBase: getMetadataBase(),
   manifest: "/manifest.webmanifest",
   keywords: ["tram", "bus", "tracker", "campus", "Bangkok University"],
   appleWebApp: {

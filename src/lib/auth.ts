@@ -3,12 +3,23 @@ import { prismaAdapter } from "better-auth/adapters/prisma";
 import { nextCookies } from "better-auth/next-js";
 import { username } from "better-auth/plugins/username";
 
+import { LOCAL_APP_URL, isLocalhostUrl, normalizeUrl } from "@/lib/config";
 import { getPrisma } from "@/lib/prisma";
 
-const authBaseURL = process.env.BETTER_AUTH_URL ?? "http://localhost:3000";
+const authBaseURL =
+  normalizeUrl(process.env.BETTER_AUTH_URL ?? process.env.NEXT_PUBLIC_APP_URL) ??
+  (process.env.NODE_ENV !== "production" ? LOCAL_APP_URL : "");
 const authSecret = process.env.BETTER_AUTH_SECRET ?? process.env.AUTH_SECRET;
 
 function createAuth() {
+  if (!authBaseURL) {
+    throw new Error("BETTER_AUTH_URL or NEXT_PUBLIC_APP_URL must be set in production");
+  }
+
+  if (process.env.NODE_ENV === "production" && isLocalhostUrl(authBaseURL)) {
+    throw new Error("BETTER_AUTH_URL cannot point to localhost in production");
+  }
+
   return betterAuth({
     appName: "BU Tram",
     baseURL: authBaseURL,

@@ -34,14 +34,14 @@ export function AdminActivityContent({ activity }: { activity: ActivityData }) {
 
   return (
     <div className="space-y-4">
-      <section className="grid gap-4 lg:grid-cols-4">
+      <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <MetricCard label={t("activity.recent_actions")} value={String(activity.recentActions.length)} hint={t("activity.recent_actions_hint")} accent="amber" icon={<History size={18} />} />
         <MetricCard label={t("activity.writable_assets")} value={String(activity.writableAssets.length)} hint={t("activity.writable_assets_hint")} icon={<FileClock size={18} />} />
         <MetricCard label={t("activity.active_sessions")} value={String(activity.activeSessionCount)} hint={t("activity.active_sessions_hint")} icon={<Clock3 size={18} />} />
         <MetricCard label={t("activity.recent_users")} value={String(activity.recentUserCount)} hint={t("activity.recent_users_hint")} icon={<Users size={18} />} />
       </section>
 
-      <section className="grid gap-4 xl:grid-cols-[minmax(0,1.15fr)_420px]">
+      <section className="grid gap-4 lg:grid-cols-[minmax(0,1.15fr)_420px]">
         <SectionCard eyebrow={t("activity.recent_actions")} title={t("activity.timeline")} description={t("activity.timeline_desc")}>
           <div className="space-y-3">
             {activity.recentActions.length > 0 ? (
