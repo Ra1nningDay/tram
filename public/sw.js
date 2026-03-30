@@ -1,4 +1,4 @@
-const VERSION = "tram-pwa-v1";
+const VERSION = "tram-pwa-v2";
 const STATIC_CACHE = `static-${VERSION}`;
 const DATA_CACHE = `data-${VERSION}`;
 const RUNTIME_CACHE = `runtime-${VERSION}`;
