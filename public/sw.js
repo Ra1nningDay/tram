@@ -1,11 +1,9 @@
-const VERSION = "tram-pwa-v2";
+const VERSION = "tram-pwa-v3";
 const STATIC_CACHE = `static-${VERSION}`;
 const DATA_CACHE = `data-${VERSION}`;
 const RUNTIME_CACHE = `runtime-${VERSION}`;
-const MAP_CACHE = `map-${VERSION}`;
 const OFFLINE_PAGE = "/offline.html";
 const MAX_RUNTIME_ENTRIES = 60;
-const MAX_MAP_ENTRIES = 120;
 
 const PRECACHE_URLS = [
   OFFLINE_PAGE,
@@ -20,8 +18,6 @@ const PRECACHE_URLS = [
   "/api/route",
   "/api/stops",
 ];
-
-const MAP_HOSTS = new Set(["tiles.openfreemap.org", "basemaps.cartocdn.com"]);
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
@@ -50,7 +46,6 @@ self.addEventListener("activate", (event) => {
         STATIC_CACHE,
         DATA_CACHE,
         RUNTIME_CACHE,
-        MAP_CACHE,
       ]);
 
       const cacheNames = await caches.keys();
@@ -100,9 +95,6 @@ self.addEventListener("fetch", (event) => {
     }
   }
 
-  if (MAP_HOSTS.has(url.hostname)) {
-    event.respondWith(staleWhileRevalidate(request, MAP_CACHE, MAX_MAP_ENTRIES));
-  }
 });
 
 self.addEventListener("notificationclick", (event) => {
