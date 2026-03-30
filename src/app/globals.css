@@ -368,6 +368,14 @@ body {
 }
 
 @layer base {
+  nextjs-portal {
+    display: none !important;
+  }
+
+  button[aria-label="Open Next.js Dev Tools"] {
+    display: none !important;
+  }
+
   .maplibregl-popup-content {
     @apply bg-transparent! shadow-none! p-0! rounded-none!;
   }

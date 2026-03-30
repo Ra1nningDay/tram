@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useRef } from "react";
-import { Locate, Scan } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { BusFront, Locate, MapPinned } from "lucide-react";
 import type { LineLayerSpecification } from "maplibre-gl";
 
 import { Map, useMap, type MapRef } from "@/components/ui/map";
@@ -83,6 +83,8 @@ type MapLayersProps = {
   onSelectVehicle: (vehicleId: string | null) => void;
   onMapReady?: (map: MapRef) => void;
   activeStopId?: string | null;
+  showStops: boolean;
+  showVehicles: boolean;
 };
 
 function MapLayers({
@@ -93,6 +95,8 @@ function MapLayers({
   onSelectVehicle,
   onMapReady,
   activeStopId,
+  showStops,
+  showVehicles,
 }: MapLayersProps) {
   const { map, isLoaded } = useMap();
 
@@ -198,6 +202,26 @@ function MapLayers({
     onMapReadyRef.current?.(map);
   }, [map, isLoaded]);
 
+  useEffect(() => {
+    if (!map || !isLoaded) return;
+
+    const visibility = showStops ? "visible" : "none";
+
+    if (map.getLayer(activeStopHaloLayer.id)) {
+      map.setLayoutProperty(activeStopHaloLayer.id, "visibility", visibility);
+    }
+
+    if (map.getLayer(stopsLayer.id)) {
+      map.setLayoutProperty(stopsLayer.id, "visibility", visibility);
+    }
+  }, [isLoaded, map, showStops]);
+
+  useEffect(() => {
+    if (!map || !isLoaded || !map.getLayer(vehiclesLayer.id)) return;
+
+    map.setLayoutProperty(vehiclesLayer.id, "visibility", showVehicles ? "visible" : "none");
+  }, [isLoaded, map, showVehicles]);
+
   // Update route source when data changes
   useEffect(() => {
     if (!map || !isLoaded) return;
@@ -242,6 +266,8 @@ export function MapView({
 }: MapViewProps) {
   const mapRef = useRef<MapRef | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const [showStops, setShowStops] = useState(true);
+  const [showVehicles, setShowVehicles] = useState(true);
 
   const isMobile = typeof window !== "undefined" ? window.innerWidth < 768 : false;
   const initialBearing = isMobile ? (campusConfig.initialBearing ?? 0) : 0;
@@ -250,14 +276,6 @@ export function MapView({
     () => getCampusViewport(CAMPUS_POLYGON, { isMobile }),
     [isMobile]
   );
-
-  const handleFitBounds = () => {
-    mapRef.current?.flyTo({
-      center: campusCenter,
-      zoom: campusConfig.initialZoom,
-      bearing: isMobile ? (campusConfig.initialBearing ?? 0) : 0,
-    });
-  };
 
   return (
     <div ref={containerRef} className="relative h-full w-full">
@@ -279,6 +297,8 @@ export function MapView({
           onSelectVehicle={onSelectVehicle}
           onMapReady={onMapReady}
           activeStopId={activeStopId}
+          showStops={showStops}
+          showVehicles={showVehicles}
         />
 
         {/* User position blue dot */}
@@ -295,28 +315,24 @@ export function MapView({
           }}
         >
           <button
-            onClick={handleFitBounds}
+            onClick={() => setShowStops((current) => !current)}
             className="border-b p-2 text-[var(--color-text)] focus:outline-none hover:bg-[var(--map-control-hover)]"
             style={{ borderColor: "var(--map-control-border)" }}
-            title="Fit to Campus"
+            title={showStops ? "ซ่อนป้าย" : "แสดงป้าย"}
+            aria-pressed={showStops}
           >
-            <Scan size={20} />
+            <MapPinned size={20} className={showStops ? "text-[var(--color-text)]" : "opacity-40"} />
           </button>
           <button
-            onClick={() => mapRef.current?.zoomIn()}
-            className="border-b p-2 text-[var(--color-text)] focus:outline-none hover:bg-[var(--map-control-hover)]"
+            onClick={() => setShowVehicles((current) => !current)}
+            className={`p-2 text-[var(--color-text)] focus:outline-none hover:bg-[var(--map-control-hover)] ${
+              onToggleTracking ? "border-b" : ""
+            }`}
             style={{ borderColor: "var(--map-control-border)" }}
-            title="Zoom In"
+            title={showVehicles ? "ซ่อนรถ" : "แสดงรถ"}
+            aria-pressed={showVehicles}
           >
-            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-          </button>
-          <button
-            onClick={() => mapRef.current?.zoomOut()}
-            className="border-b p-2 text-[var(--color-text)] focus:outline-none hover:bg-[var(--map-control-hover)]"
-            style={{ borderColor: "var(--map-control-border)" }}
-            title="Zoom Out"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            <BusFront size={20} className={showVehicles ? "text-[var(--color-text)]" : "opacity-40"} />
           </button>
           {onToggleTracking && (
             <button
@@ -326,7 +342,7 @@ export function MapView({
                   ? "text-blue-500"
                   : "text-[var(--color-text)]"
               }`}
-              title={isTrackingLocation ? "Stop tracking" : "Find my location"}
+              title={isTrackingLocation ? "หยุดติดตามตำแหน่ง" : "ค้นหาตำแหน่งของฉัน"}
             >
               <Locate size={20} />
             </button>

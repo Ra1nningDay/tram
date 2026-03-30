@@ -12,6 +12,7 @@ import {
   RefreshCcw,
   TriangleAlert,
   Users,
+  Wifi,
   X,
 } from "lucide-react";
 import { startTransition, useEffect, useState } from "react";
@@ -25,6 +26,7 @@ const kanit = Kanit({
 
 type DriverMode = "off" | "available" | "full";
 type DriverTab = "home" | "alerts";
+type AlertTone = "idle" | "positive" | "negative";
 
 type DriverModeConfig = {
   orbIcon: LucideIcon;
@@ -44,22 +46,12 @@ const ROUTE_OPTIONS = [
   "สายที่ 3 : ศูนย์กีฬา",
 ] as const;
 
-const ALERT_ITEMS = [
-  {
-    id: "capacity",
-    title: "รถพร้อมรับผู้โดยสาร",
-    detail: "สถานะปัจจุบันพร้อมใช้งานและยังมีพื้นที่ว่างในรถ",
-  },
-  {
-    id: "terminal",
-    title: "จุดปลายทางรับทราบสถานะแล้ว",
-    detail: "อัปเดตล่าสุดถูกส่งไปยังปลายทางของสายที่เลือก",
-  },
-  {
-    id: "system",
-    title: "หน้า driver ยังเป็น demo",
-    detail: "ยังไม่เชื่อม auth หรือ backend จริง แต่ interaction หลักพร้อมใช้งาน",
-  },
+const ISSUE_OPTIONS = [
+  "ปัญหา",
+  "อินเทอร์เน็ตขัดข้อง",
+  "การแจ้งเตือนไม่ทำงาน",
+  "อุปกรณ์ภายในรถมีปัญหา",
+  "อื่น ๆ",
 ] as const;
 
 const VEHICLE_LIST = [
@@ -75,7 +67,7 @@ const MODE_CONFIG: Record<DriverMode, DriverModeConfig> = {
     orbIcon: Power,
     dutyLabel: "หยุดทำงาน",
     dotClassName: "bg-[#ff4b4b] text-[#ff4b4b]",
-    statusLabel: "คนน้อย",
+    statusLabel: "ว่าง",
     statusClassName: "text-white",
     helperLabel: "แตะเพื่อทำงาน",
     orbClassName:
@@ -87,7 +79,7 @@ const MODE_CONFIG: Record<DriverMode, DriverModeConfig> = {
     orbIcon: Users,
     dutyLabel: "กำลังทำงาน",
     dotClassName: "bg-[#4ade80] text-[#4ade80]",
-    statusLabel: "คนน้อย",
+    statusLabel: "ว่าง",
     statusClassName: "text-[#4ade80]",
     helperLabel: "แตะเพื่อเปลี่ยนสถานะ",
     orbClassName:
@@ -116,6 +108,94 @@ function formatDuration(elapsedMs: number) {
   const seconds = String(totalSeconds % 60).padStart(2, "0");
 
   return `${hours}:${minutes}:${seconds}`;
+}
+
+function cycleAlertTone(currentTone: AlertTone) {
+  if (currentTone === "idle") {
+    return "positive";
+  }
+
+  if (currentTone === "positive") {
+    return "negative";
+  }
+
+  return "idle";
+}
+
+function getConnectivityLabel(tone: AlertTone) {
+  if (tone === "positive") {
+    return "อินเตอร์เน็ต";
+  }
+
+  if (tone === "negative") {
+    return "อินเตอร์เน็ต";
+  }
+
+  return "อินเตอร์เน็ต";
+}
+
+function getNotificationLabel(tone: AlertTone) {
+  if (tone === "positive") {
+    return "เปิดแจ้งเตือน";
+  }
+
+  if (tone === "negative") {
+    return "ปิดแจ้งเตือน";
+  }
+
+  return "เปิดแจ้งเตือน";
+}
+
+type AlertStatusButtonProps = {
+  icon: LucideIcon;
+  label: string;
+  tone: AlertTone;
+  onClick: () => void;
+};
+
+function AlertStatusButton({ icon: Icon, label, tone, onClick }: AlertStatusButtonProps) {
+  const toneClassName =
+    tone === "positive"
+      ? "border-[#7af18b]/50 bg-[radial-gradient(circle_at_top,_#71df7c_0%,_#4db95a_58%,_#3a9246_100%)] shadow-[0_0_0_6px_rgba(80,212,108,0.1),0_10px_24px_rgba(37,102,48,0.38)]"
+      : tone === "negative"
+        ? "border-[#ff756f]/45 bg-[radial-gradient(circle_at_top,_#ff7975_0%,_#f0524c_58%,_#bf342f_100%)] shadow-[0_0_0_6px_rgba(255,98,92,0.12),0_18px_28px_rgba(89,23,22,0.44)]"
+        : "border-white/[0.08] bg-[linear-gradient(180deg,_#3a3a3a_0%,_#303030_100%)] shadow-[inset_0_1px_0_rgba(255,255,255,0.04),0_16px_22px_rgba(0,0,0,0.24)]";
+
+  const innerRingClassName =
+    tone === "idle" ? "border-white/[0.05]" : "border-white/10";
+
+  const labelClassName =
+    tone === "positive"
+      ? "text-[#50d86a]"
+      : tone === "negative"
+        ? "text-[#ff625c]"
+        : "text-white/48";
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex flex-col items-center gap-3 focus:outline-none"
+      aria-label={label}
+    >
+      <span
+        className={cn(
+          "relative flex h-[78px] w-[78px] items-center justify-center rounded-full border transition duration-200",
+          toneClassName
+        )}
+      >
+        <span
+          className={cn(
+            "pointer-events-none absolute inset-[6px] rounded-full border",
+            innerRingClassName
+          )}
+        />
+        <Icon className="relative z-10 h-[31px] w-[31px] stroke-[2.1] text-white" />
+      </span>
+
+      <span className={cn("text-[12px] font-semibold leading-none", labelClassName)}>{label}</span>
+    </button>
+  );
 }
 
 type ActionRowProps = {
@@ -158,30 +238,22 @@ function BottomNavButton({ active, icon: Icon, label, onClick }: BottomNavButton
     <button
       type="button"
       onClick={onClick}
-      className="group relative flex h-[60px] flex-1 flex-col items-center justify-end pb-1.5 text-[10px] text-white/62 transition focus:outline-none"
+      className="relative flex h-[62px] flex-1 flex-col items-center justify-end pb-1 text-[11px] transition focus:outline-none"
     >
-      <div className="absolute -top-7 left-1/2 z-10 flex -translate-x-1/2 items-center justify-center transition-all duration-300">
-        {active ? (
-          <div className="relative flex h-[56px] w-[56px] items-center justify-center rounded-full bg-black shadow-[0_4px_10px_rgba(0,0,0,0.4)]">
-            <Icon className="h-[24px] w-[24px] text-white" />
-          </div>
-        ) : (
-          <div className="flex h-[44px] w-[44px] translate-y-6 items-center justify-center rounded-full bg-transparent opacity-0 transition-all duration-300 group-hover:bg-white/[0.04] group-hover:opacity-100">
-            <Icon className="h-[20px] w-[20px] text-white/54" />
-          </div>
-        )}
-      </div>
-
-      {!active && (
-        <div className="mb-1 flex h-[28px] w-[28px] items-center justify-center">
-          <Icon className="h-[20px] w-[20px] text-white/54 transition-colors group-hover:text-white/80" />
+      {active && (
+        <div className="absolute -top-[28px] left-1/2 z-20 flex h-[56px] w-[56px] -translate-x-1/2 items-center justify-center rounded-full border border-white/[0.08] bg-[#080808] shadow-[0_0_0_5px_#252525]">
+          <Icon className="h-[22px] w-[22px] text-white" />
         </div>
       )}
 
+      <div className="mb-1 flex h-[22px] w-[22px] items-center justify-center">
+        {!active && <Icon className="h-[18px] w-[18px] text-white/55" />}
+      </div>
+
       <span
         className={cn(
-          "relative z-20 transition-all duration-300 text-[11px]",
-          active ? "font-semibold text-white" : "font-medium text-white/46 group-hover:text-white/60"
+          "relative z-20 text-[11px]",
+          active ? "font-medium text-white" : "font-medium text-white/46"
         )}
       >
         {label}
@@ -196,6 +268,10 @@ export function DriverDemoScreen() {
   const [routeIndex, setRouteIndex] = useState(0);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedVehicle, setSelectedVehicle] = useState("TRAM-8");
+  const [connectivityTone, setConnectivityTone] = useState<AlertTone>("positive");
+  const [notificationTone, setNotificationTone] = useState<AlertTone>("positive");
+  const [selectedIssue, setSelectedIssue] = useState<(typeof ISSUE_OPTIONS)[number]>("ปัญหา");
+  const [issueDetails, setIssueDetails] = useState("");
   const [now, setNow] = useState(() => Date.now());
   const [startedAt, setStartedAt] = useState<number | null>(null);
 
@@ -212,6 +288,8 @@ export function DriverDemoScreen() {
   const config = MODE_CONFIG[mode];
   const MainIcon = config.orbIcon;
   const elapsedLabel = formatDuration(startedAt ? now - startedAt : 0);
+  const connectivityLabel = getConnectivityLabel(connectivityTone);
+  const notificationLabel = getNotificationLabel(notificationTone);
 
   function handlePrimaryAction() {
     startTransition(() => {
@@ -413,51 +491,107 @@ export function DriverDemoScreen() {
             </>
           ) : (
             <>
-              <header className="border-b border-white/10 px-5 pb-4 pt-5">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-[15px] font-semibold text-white">แจ้งเตือน</p>
-                    <p className="mt-1 text-[11px] text-white/42">{selectedVehicle}</p>
-                  </div>
-                  <span className="rounded-full border border-white/12 px-2.5 py-1 text-[10px] font-medium text-white/72">
-                    {ALERT_ITEMS.length} รายการ
-                  </span>
+              <header className="px-5 pb-3 pt-5">
+                <div className="flex items-center gap-2">
+                  <span
+                    className={cn(
+                      "h-2.5 w-2.5 rounded-full shadow-[0_0_14px_currentColor]",
+                      config.dotClassName
+                    )}
+                  />
+                  <p className="text-[15px] font-semibold text-white">{config.dutyLabel}</p>
                 </div>
               </header>
 
-              <div className="flex-1 overflow-y-auto px-5 py-4">
-                <div className="space-y-3">
-                  {ALERT_ITEMS.map((item) => (
-                    <article
-                      key={item.id}
-                      className="rounded-[18px] border border-white/10 bg-white/[0.04] px-4 py-3"
+              <div className="h-px bg-white/10" />
+
+              <div className="flex flex-1 flex-col overflow-y-auto">
+                <div className="px-[35px] pt-[28px]">
+                  <div className="grid grid-cols-2 gap-[36px]">
+                    <AlertStatusButton
+                      icon={Wifi}
+                      label={connectivityLabel}
+                      tone={connectivityTone}
+                      onClick={() =>
+                        setConnectivityTone((currentTone) => cycleAlertTone(currentTone))
+                      }
+                    />
+                    <AlertStatusButton
+                      icon={Bell}
+                      label={notificationLabel}
+                      tone={notificationTone}
+                      onClick={() =>
+                        setNotificationTone((currentTone) => cycleAlertTone(currentTone))
+                      }
+                    />
+                  </div>
+
+                  <div className="mt-[18px] flex min-w-0 items-center gap-2.5">
+                    <button
+                      type="button"
+                      onClick={() => setIsModalOpen(true)}
+                      className="inline-flex h-[30px] items-center gap-1.5 rounded-full border border-[#8391af]/70 bg-[#26282c] pl-3 pr-2.5 text-[12px] font-semibold text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] transition hover:bg-[#2b2d33] focus:outline-none focus:ring-2 focus:ring-white/20"
                     >
-                      <p className="text-[13px] font-semibold text-white">{item.title}</p>
-                      <p className="mt-1 text-[11px] leading-5 text-white/58">{item.detail}</p>
-                    </article>
-                  ))}
+                      <BusFront className="h-[14px] w-[14px] stroke-[1.8]" />
+                      {selectedVehicle}
+                      <RefreshCcw className="h-[11px] w-[11px] stroke-[2]" />
+                    </button>
+                    <p className="min-w-0 truncate text-[13px] font-medium text-white/92">
+                      ชื่อ : {DRIVER_NAME}
+                    </p>
+                  </div>
                 </div>
+
+                <div className="mt-[16px] h-px bg-white/10" />
+
+                <form className="flex flex-1 flex-col px-[43px] pb-[14px] pt-[18px]">
+                  <label htmlFor="driver-issue" className="text-[12px] font-medium text-white/34">
+                    เลือกปัญหาที่พบ
+                  </label>
+                  <div className="relative mt-[13px]">
+                    <select
+                      id="driver-issue"
+                      value={selectedIssue}
+                      onChange={(event) =>
+                        setSelectedIssue(event.target.value as (typeof ISSUE_OPTIONS)[number])
+                      }
+                      className="h-[47px] w-full appearance-none rounded-[8px] border border-white/[0.12] bg-[linear-gradient(135deg,_#4a4a4a_0%,_#323232_100%)] px-4 text-[13px] font-medium text-white/48 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] outline-none transition focus:border-white/16"
+                    >
+                      {ISSUE_OPTIONS.map((option) => (
+                        <option key={option} value={option}>
+                          {option}
+                        </option>
+                      ))}
+                    </select>
+                    <ChevronDown className="pointer-events-none absolute right-4 top-1/2 h-[15px] w-[15px] -translate-y-1/2 text-white/36" />
+                  </div>
+
+                  <label
+                    htmlFor="driver-issue-detail"
+                    className="mt-[20px] text-[12px] font-medium text-white/34"
+                  >
+                    รายละเอียดเพิ่มเติม
+                  </label>
+                  <textarea
+                    id="driver-issue-detail"
+                    value={issueDetails}
+                    onChange={(event) => setIssueDetails(event.target.value)}
+                    placeholder="พิมพ์รายละเอียดเบื้องต้น..."
+                    className="mt-[13px] h-[140px] w-full resize-none rounded-[8px] border border-white/[0.12] bg-[linear-gradient(135deg,_#464646_0%,_#2e2e2e_100%)] px-4 py-4 text-[13px] leading-6 text-white/72 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] outline-none placeholder:text-white/24 transition focus:border-white/16"
+                  />
+
+                  <button
+                    type="button"
+                    className="mt-auto h-[42px] w-full rounded-[14px] bg-[#ff5256] text-[17px] mb-8 font-medium text-white shadow-[0_10px_24px_rgba(255,82,86,0.2)] transition hover:bg-[#ff6161] focus:outline-none focus:ring-2 focus:ring-white/12"
+                  >
+                    แจ้งปัญหา
+                  </button>
+                </form>
               </div>
             </>
           )}
 
-          <nav className="relative mt-auto grid grid-cols-2 items-end gap-2 bg-transparent px-5 pb-3 pt-2">
-            {/* Transparent Cutout Background Overlay */}
-            <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden">
-              <div className="grid h-full w-full grid-cols-2 gap-2 px-5 pt-2">
-                <div className="relative h-full w-full">
-                  {activeTab === "home" && (
-                    <div className="absolute left-1/2 top-0 h-[68px] w-[68px] -translate-x-1/2 -translate-y-[34px] rounded-full bg-transparent shadow-[0_0_0_2000px_#060606] transition-all duration-300" />
-                  )}
-                </div>
-                <div className="relative h-full w-full">
-                  {activeTab === "alerts" && (
-                    <div className="absolute left-1/2 top-0 h-[68px] w-[68px] -translate-x-1/2 -translate-y-[34px] rounded-full bg-transparent shadow-[0_0_0_2000px_#060606] transition-all duration-300" />
-                  )}
-                </div>
-              </div>
-            </div>
-
+          <nav className="relative mt-auto grid grid-cols-2 items-end gap-2 bg-[#060606] px-6 pb-2 pt-3">
             <BottomNavButton
               active={activeTab === "home"}
               icon={BusFront}

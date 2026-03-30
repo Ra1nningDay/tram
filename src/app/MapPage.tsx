@@ -1,10 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 
 import type { MapRef } from "@/components/ui/map";
-import { Header } from "@/components/Header";
+import { Header, type HeaderSearchResult } from "@/components/Header";
 
 import { VehiclePanel } from "../components/VehiclePanel";
 import campusConfig from "../data/campus-config.json";
@@ -20,6 +20,49 @@ import { haversineM } from "../lib/geo/distance";
 const ALERT_STORAGE_KEY = "map-arrival-alerts-enabled";
 const STOP_PROXIMITY_VIBRATION_DISTANCE_M = 20;
 
+type PanelSnapLevel = 0 | 1 | 2;
+type MapSearchResult = HeaderSearchResult & { rank: number };
+
+function normalizeSearchText(value: string): string {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[_-]+/g, " ")
+    .replace(/\s+/g, " ");
+}
+
+function compactSearchText(value: string): string {
+  return normalizeSearchText(value).replace(/\s+/g, "");
+}
+
+function getSearchRank(query: string, candidates: string[]): number | null {
+  if (!query) return null;
+
+  const compactQuery = compactSearchText(query);
+  let bestRank: number | null = null;
+
+  for (const candidate of candidates) {
+    const normalizedCandidate = normalizeSearchText(candidate);
+    if (!normalizedCandidate) continue;
+
+    const compactCandidate = compactSearchText(candidate);
+    const rank =
+      normalizedCandidate === query || compactCandidate === compactQuery
+        ? 0
+        : normalizedCandidate.startsWith(query) || compactCandidate.startsWith(compactQuery)
+          ? 1
+          : normalizedCandidate.includes(query) || compactCandidate.includes(compactQuery)
+            ? 2
+            : null;
+
+    if (rank !== null && (bestRank === null || rank < bestRank)) {
+      bestRank = rank;
+    }
+  }
+
+  return bestRank;
+}
+
 const MapView = dynamic(
   () => import("../features/map/MapView").then((mod) => mod.MapView),
   {
@@ -27,6 +70,22 @@ const MapView = dynamic(
     loading: () => <div className="h-full w-full" />,
   }
 );
+
+function MapLoadingOverlay() {
+  return (
+    <div
+      className="absolute inset-0 z-50 flex items-center justify-center backdrop-blur-sm"
+      style={{ background: "var(--overlay)" }}
+      aria-live="polite"
+      aria-busy="true"
+    >
+      <div className="glass-card-dark flex h-20 w-20 items-center justify-center rounded-full border border-white/10 shadow-2xl">
+        <span className="sr-only">กำลังโหลดข้อมูลตำแหน่งรถ</span>
+        <div className="h-10 w-10 animate-spin rounded-full border-[3px] border-white/12 border-t-primary shadow-[0_0_24px_rgba(254,80,80,0.18)]" />
+      </div>
+    </div>
+  );
+}
 
 export function MapPage() {
   const { data: routeData } = useRoute();
@@ -46,6 +105,10 @@ export function MapPage() {
   const [selectedVehicleId, setSelectedVehicleId] = useState<string | null>(null);
   const [selectedStopId, setSelectedStopId] = useState<string | null>(null);
   const [isAlertEnabled, setIsAlertEnabled] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [panelSnapLevel, setPanelSnapLevel] = useState<PanelSnapLevel>(1);
+  const [autoExpandVehicleRequest, setAutoExpandVehicleRequest] = useState<string | null>(null);
   const mapRef = useRef<MapRef | null>(null);
   const selectedVehicleIdRef = useRef<string | null>(null);
   const selectedVehicleCoordsRef = useRef<[number, number] | null>(null);
@@ -91,6 +154,80 @@ export function MapPage() {
     : null;
   const isAlertSupported =
     typeof window !== "undefined" && typeof Notification !== "undefined";
+  const telemetryByVehicleId = useMemo(() => {
+    const map = new Map<string, (typeof telemetry)[number]>();
+
+    for (const item of telemetry) {
+      map.set(item.vehicleId, item);
+    }
+
+    return map;
+  }, [telemetry]);
+
+  const normalizedSearchQuery = useMemo(
+    () => normalizeSearchText(searchQuery),
+    [searchQuery]
+  );
+
+  const searchResults = useMemo<MapSearchResult[]>(() => {
+    if (!normalizedSearchQuery) return [];
+
+    const results: MapSearchResult[] = [];
+
+    for (const vehicle of vehicles) {
+      const tele = telemetryByVehicleId.get(vehicle.id);
+      const title = tele?.label ?? vehicle.label ?? vehicle.id;
+      const subtitle = tele?.nextStopName
+        ? `รหัส ${vehicle.id} • ไป ${tele.nextStopName}`
+        : `รหัส ${vehicle.id}`;
+      const rank = getSearchRank(normalizedSearchQuery, [
+        title,
+        vehicle.label ?? "",
+        vehicle.id,
+        title.replace(/_/g, " "),
+        subtitle,
+      ]);
+
+      if (rank === null) continue;
+
+      results.push({
+        id: vehicle.id,
+        type: "vehicle",
+        title,
+        subtitle,
+        rank,
+      });
+    }
+
+    for (const stop of allStops ?? []) {
+      const subtitle = stop.name_en?.trim()
+        ? `ป้าย ${stop.sequence} • ${stop.name_en}`
+        : `ป้าย ${stop.sequence}`;
+      const rank = getSearchRank(normalizedSearchQuery, [
+        stop.name_th,
+        stop.name_en ?? "",
+        stop.id,
+        `ป้าย ${stop.sequence}`,
+        `stop ${stop.sequence}`,
+      ]);
+
+      if (rank === null) continue;
+
+      results.push({
+        id: stop.id,
+        type: "stop",
+        title: stop.name_th,
+        subtitle,
+        rank,
+      });
+    }
+
+    return results.sort((left, right) => {
+      if (left.rank !== right.rank) return left.rank - right.rank;
+      if (left.type !== right.type) return left.type === "vehicle" ? -1 : 1;
+      return left.title.localeCompare(right.title, "th");
+    });
+  }, [allStops, normalizedSearchQuery, telemetryByVehicleId, vehicles]);
 
   const handleMapReady = useCallback(
     (map: MapRef) => {
@@ -266,39 +403,123 @@ export function MapPage() {
     });
   }, [isMobile, selectedStopId, selectedVehicleId]);
 
-  const handleSelectVehicle = useCallback((id: string | null) => {
-    setSelectedVehicleId((prev) => {
-      if (id === null) return null;
-      return prev === id ? null : id;
+  const handleSelectVehicle = useCallback((
+    id: string | null,
+    options?: { panelSnapLevel?: PanelSnapLevel }
+  ) => {
+    setAutoExpandVehicleRequest(null);
+
+    const nextVehicleId =
+      id === null ? null : selectedVehicleId === id ? null : id;
+
+    if (nextVehicleId !== null) {
+      userManuallySelectedRef.current = true;
+      setSelectedStopId(null);
+      if (options?.panelSnapLevel !== undefined) {
+        setPanelSnapLevel(options.panelSnapLevel);
+      }
+    }
+
+    setSelectedVehicleId(nextVehicleId);
+  }, [selectedVehicleId]);
+
+  const handleSelectVehicleFromMap = useCallback((id: string | null) => {
+    handleSelectVehicle(id, { panelSnapLevel: 2 });
+  }, [handleSelectVehicle]);
+
+  const handleSelectVehicleFromPanel = useCallback((id: string | null) => {
+    handleSelectVehicle(id);
+  }, [handleSelectVehicle]);
+
+  const flyToStop = useCallback((stopId: string) => {
+    const stop = allStops?.find((item) => item.id === stopId);
+    if (!stop || !mapRef.current) return;
+
+    isFlyingRef.current = true;
+    mapRef.current.flyTo({
+      center: [stop.longitude, stop.latitude],
+      zoom: 17,
+      duration: 800,
     });
-  }, []);
+    mapRef.current.once("moveend", () => {
+      isFlyingRef.current = false;
+    });
+  }, [allStops]);
 
   const handleSelectStop = useCallback(
     (stopId: string) => {
       setSelectedStopId((prev) => (prev === stopId ? null : stopId));
       setSelectedVehicleId(null);
+      setAutoExpandVehicleRequest(null);
       userManuallySelectedRef.current = true;
-
-      const stop = allStops?.find((item) => item.id === stopId);
-      if (stop && mapRef.current) {
-        isFlyingRef.current = true;
-        mapRef.current.flyTo({
-          center: [stop.longitude, stop.latitude],
-          zoom: 17,
-          duration: 800,
-        });
-        mapRef.current.once("moveend", () => {
-          isFlyingRef.current = false;
-        });
-      }
+      flyToStop(stopId);
     },
-    [allStops]
+    [flyToStop]
   );
+
+  const focusStopFromSearch = useCallback((stopId: string) => {
+    userManuallySelectedRef.current = true;
+    setSelectedVehicleId(null);
+    setAutoExpandVehicleRequest(null);
+    setSelectedStopId(stopId);
+    setPanelSnapLevel(1);
+    flyToStop(stopId);
+  }, [flyToStop]);
+
+  const focusVehicleFromSearch = useCallback((vehicleId: string) => {
+    userManuallySelectedRef.current = true;
+    setSelectedStopId(null);
+    setSelectedVehicleId(vehicleId);
+    setAutoExpandVehicleRequest(`${vehicleId}:${Date.now()}`);
+    setPanelSnapLevel(1);
+  }, []);
 
   const handleClearStopSelection = useCallback(() => {
     setSelectedStopId(null);
     userManuallySelectedRef.current = true;
   }, []);
+
+  const handleSearchValueChange = useCallback((value: string) => {
+    setSearchQuery(value);
+    setIsSearchOpen(Boolean(value.trim()));
+  }, []);
+
+  const handleSearchOpenChange = useCallback((open: boolean) => {
+    setIsSearchOpen(open && Boolean(searchQuery.trim()));
+  }, [searchQuery]);
+
+  const handleSearchSelect = useCallback((result: HeaderSearchResult) => {
+    setSearchQuery("");
+    setIsSearchOpen(false);
+
+    if (result.type === "vehicle") {
+      focusVehicleFromSearch(result.id);
+      return;
+    }
+
+    focusStopFromSearch(result.id);
+  }, [focusStopFromSearch, focusVehicleFromSearch]);
+
+  const headerSearch = useMemo(() => ({
+    value: searchQuery,
+    results: searchResults.map((result) => ({
+      id: result.id,
+      type: result.type,
+      title: result.title,
+      subtitle: result.subtitle,
+    })),
+    isOpen: isSearchOpen,
+    onValueChange: handleSearchValueChange,
+    onOpenChange: handleSearchOpenChange,
+    onSelect: handleSearchSelect,
+  }), [
+    handleSearchOpenChange,
+    handleSearchSelect,
+    handleSearchValueChange,
+    isSearchOpen,
+    searchQuery,
+    searchResults,
+  ]);
 
   const handleToggleTracking = useCallback(() => {
     if (isTrackingLocation) {
@@ -403,7 +624,7 @@ export function MapPage() {
           stops={stopsData?.stops}
           vehicles={vehicles}
           onSelectStop={handleSelectStop}
-          onSelectVehicle={handleSelectVehicle}
+          onSelectVehicle={handleSelectVehicleFromMap}
           onMapReady={handleMapReady}
           userLocation={userLocation}
           isTrackingLocation={isTrackingLocation}
@@ -416,30 +637,20 @@ export function MapPage() {
         isAlertEnabled={isAlertEnabled}
         isAlertSupported={isAlertSupported}
         onToggleAlert={handleToggleAlert}
+        search={headerSearch}
       />
 
-      {loading && (
-        <div
-          className="absolute inset-0 z-50 flex items-center justify-center backdrop-blur-sm"
-          style={{ background: "var(--overlay)" }}
-        >
-          <div className="glass-card-dark rounded-2xl px-8 py-6 shadow-xl">
-            <div className="flex items-center gap-3">
-              <div className="h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-              <span className="text-sm font-medium text-muted">
-                Loading GPS data...
-              </span>
-            </div>
-          </div>
-        </div>
-      )}
+      {loading && <MapLoadingOverlay />}
 
       {!loading && (
         <VehiclePanel
           vehicles={vehicles}
           telemetry={telemetry}
-          onSelectVehicle={handleSelectVehicle}
+          onSelectVehicle={handleSelectVehicleFromPanel}
           selectedVehicleId={selectedVehicleId}
+          snapLevel={panelSnapLevel}
+          onSnapLevelChange={setPanelSnapLevel}
+          autoExpandVehicleRequest={autoExpandVehicleRequest}
           stop={selectedStop}
           stopEtas={selectedStopEtas}
           stopDistanceM={selectedStopDistanceM}

@@ -1,4 +1,5 @@
-import { Bell, BellRing, Bus, ChevronDown, Clock, MapPin, User, X } from "lucide-react";
+import Image from "next/image";
+import { Bell, BellRing, Bus, ChevronDown, ChevronUp, Clock, MapPin, User, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import type { Eta, Stop, Vehicle } from "../features/shuttle/api";
@@ -10,6 +11,9 @@ interface VehiclePanelProps {
   telemetry: VehicleTelemetry[];
   onSelectVehicle?: (id: string | null) => void;
   selectedVehicleId?: string | null;
+  snapLevel?: 0 | 1 | 2;
+  onSnapLevelChange?: (level: 0 | 1 | 2) => void;
+  autoExpandVehicleRequest?: string | null;
   stop?: Stop | null;
   stopEtas?: Eta[];
   stopDistanceM?: number;
@@ -35,21 +39,21 @@ function normalizeLookupKey(value?: string | null): string | null {
 }
 
 function formatDistanceEta(distanceM: number, speedKmh: number): string {
-  if (speedKmh < 0.5) return "Boarding";
+  if (speedKmh < 0.5) return "รถจอดรับ";
   const hours = distanceM / 1000 / speedKmh;
   const minutes = Math.round(hours * 60);
-  if (minutes < 1) return "< 1 min";
-  if (minutes === 1) return "~1 min";
-  return `~${minutes} min`;
+  if (minutes < 1) return "< 1 นาที";
+  if (minutes === 1) return "~1 นาที";
+  return `~${minutes} นาที`;
 }
 
 function formatEtaMinutes(eta?: Eta): string {
   if (!eta || eta.status !== "fresh" || eta.eta_minutes < 0) {
-    return "Updating";
+    return "กำลังอัปเดต";
   }
 
-  if (eta.eta_minutes < 1) return "< 1 min";
-  return `~${eta.eta_minutes} min`;
+  if (eta.eta_minutes < 1) return "< 1 นาที";
+  return `~${eta.eta_minutes} นาที`;
 }
 
 function getDensity(status: string): {
@@ -58,10 +62,10 @@ function getDensity(status: string): {
   color: string;
 } {
   if (status === "warning") {
-    return { label: "High", level: 3, color: "#EF4444" };
+    return { label: "หนาแน่น", level: 3, color: "#EF4444" };
   }
 
-  return { label: "Normal", level: 1, color: "#22C55E" };
+  return { label: "ปกติ", level: 1, color: "#22C55E" };
 }
 
 function getDistanceBetweenStops(
@@ -82,6 +86,139 @@ function getDistanceBetweenStops(
   }
 
   return Math.max(0, distance);
+}
+
+type PanelTheme = {
+  skyGradient: string;
+  skyGlow: string;
+  handleChevron: string;
+};
+
+const MOBILE_HEADER_HEIGHT = 126;
+const DESKTOP_HEADER_HEIGHT = 122;
+
+function getPanelTheme(date = new Date()): PanelTheme {
+  const hour = date.getHours();
+  const isMorning = hour >= 5 && hour < 12;
+
+  if (isMorning) {
+    return {
+      skyGradient:
+        "linear-gradient(180deg, #8BD9FF 0%, #55C1F4 58%, #219BDF 100%)",
+      skyGlow:
+        "radial-gradient(circle at 50% -12%, rgba(255,255,255,0.56) 0%, rgba(255,255,255,0.16) 34%, rgba(255,255,255,0) 72%)",
+      handleChevron: "#7E9ECE",
+    };
+  }
+
+  return {
+    skyGradient:
+      "linear-gradient(180deg, #F1A253 0%, #E68E57 52%, #C76B61 100%)",
+    skyGlow:
+      "radial-gradient(circle at 50% -12%, rgba(255,243,224,0.44) 0%, rgba(255,223,187,0.12) 36%, rgba(255,255,255,0) 72%)",
+    handleChevron: "#FFF7ED",
+  };
+}
+
+function IllustratedPanelHeader({
+  theme,
+  mobile = false,
+  snapLevel,
+  onToggle,
+}: {
+  theme: PanelTheme;
+  mobile?: boolean;
+  snapLevel?: 0 | 1 | 2;
+  onToggle?: () => void;
+}) {
+  const headerHeight = mobile ? MOBILE_HEADER_HEIGHT : DESKTOP_HEADER_HEIGHT;
+  const ChevronIcon = snapLevel === 2 ? ChevronDown : ChevronUp;
+
+  const content = (
+    <>
+      <div className="absolute inset-0" style={{ background: theme.skyGradient }} />
+      <div className="absolute inset-0" style={{ background: theme.skyGlow }} />
+      <div className="pointer-events-none absolute inset-x-0 bottom-[28px] h-10 bg-gradient-to-b from-transparent via-white/5 to-white/20 opacity-80" />
+      <div
+        className="absolute inset-x-0 bottom-0 h-[28px] border-t border-black/10 backdrop-blur-xl"
+        style={{ background: "var(--glass-strong-bg)" }}
+      />
+
+      {mobile && (
+        <div className="absolute inset-x-0 top-[8px] z-20 flex justify-center">
+          <ChevronIcon
+            size={28}
+            strokeWidth={2.25}
+            className="drop-shadow-[0_2px_6px_rgba(0,0,0,0.22)]"
+            style={{ color: theme.handleChevron }}
+          />
+        </div>
+      )}
+
+      <div className={`absolute left-5 z-20 ${mobile ? "top-[22px]" : "top-[16px]"}`}>
+        <h2
+          className={`font-heading font-bold leading-none tracking-[-0.04em] text-white drop-shadow-[0_3px_10px_rgba(0,0,0,0.22)] ${mobile ? "text-[1.45rem]" : "text-[1.65rem]"
+            }`}
+        >
+          ดูรอบรถ
+        </h2>
+      </div>
+
+      <div className={`pointer-events-none absolute z-10 ${mobile ? "bottom-[12px] left-4" : "bottom-[10px] left-5"}`}>
+        <Image
+          src="/busstop.png"
+          alt=""
+          aria-hidden="true"
+          width={131}
+          height={65}
+          sizes={mobile ? "118px" : "126px"}
+          className={`${mobile ? "w-[118px]" : "w-[126px]"} h-auto`}
+        />
+      </div>
+
+      <div className={`pointer-events-none absolute z-10 ${mobile ? "bottom-[4px] -right-[5px]" : "bottom-[2px] -right-[10px]"}`}>
+        <Image
+          src="/bus.png"
+          alt=""
+          aria-hidden="true"
+          width={115}
+          height={85}
+          sizes={mobile ? "122px" : "132px"}
+          className={`${mobile ? "w-[122px]" : "w-[132px]"} h-auto`}
+        />
+      </div>
+    </>
+  );
+
+  if (mobile) {
+    return (
+      <div
+        role="button"
+        tabIndex={0}
+        onClick={onToggle}
+        onKeyDown={(event) => {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            onToggle?.();
+          }
+        }}
+        className="absolute inset-x-0 top-0 z-30 w-full overflow-hidden rounded-t-[28px] text-left transition-[filter] duration-200 active:brightness-95"
+        style={{ height: headerHeight }}
+        aria-label={snapLevel === 2 ? "ย่อแผงข้อมูลรถ" : "ขยายแผงข้อมูลรถ"}
+      >
+        {content}
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className="relative z-10 overflow-hidden border-b border-[var(--glass-border)]/70"
+      style={{ height: headerHeight }}
+    >
+      {content}
+    </div>
+  );
 }
 
 function DensityBars({ level, color }: { level: number; color: string }) {
@@ -116,10 +253,8 @@ function StopContextHeader({
   onClearStop?: () => void;
 }) {
   const title = stop.name_th;
-  const subtitle = stop.name_en?.trim() || `Stop ${stop.sequence}`;
-  const kindLabel = stopKind === "nearest" ? "Nearby Stop" : "Selected Stop";
-  const vehicleCountLabel =
-    stopEtas.length === 1 ? "1 vehicle arriving" : `${stopEtas.length} vehicles arriving`;
+  const kindLabel = stopKind === "nearest" ? "ป้ายใกล้คุณ" : "ป้ายที่เลือก";
+  const vehicleCountLabel = `รถกำลังมาถึง ${stopEtas.length} คัน`;
   const distanceLabel =
     typeof stopDistanceM === "number"
       ? `${formatDistance(stopDistanceM)} | ${formatWalkingTime(stopDistanceM)}`
@@ -127,7 +262,6 @@ function StopContextHeader({
 
   return (
     <div className="relative z-10 overflow-hidden border-b border-[var(--glass-border)]/80 px-4 pb-3 pt-3">
-      <div className="pointer-events-none absolute inset-x-4 top-0 h-px bg-gradient-to-r from-primary via-accent/70 to-transparent opacity-80" />
       <div className="pointer-events-none absolute left-2 top-2 h-20 w-24 rounded-full bg-primary/12 blur-3xl" />
 
       <div className="relative flex items-start gap-3">
@@ -141,7 +275,7 @@ function StopContextHeader({
                   {kindLabel}
                 </span>
                 <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-[var(--text-faint)]">
-                  Stop {stop.sequence}
+                  ป้าย {stop.sequence}
                 </span>
               </div>
 
@@ -158,7 +292,7 @@ function StopContextHeader({
                 type="button"
                 onClick={onClearStop}
                 className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[var(--glass-border)] bg-[var(--map-control-hover)]/65 text-[var(--text-faint)] transition-colors hover:border-primary/30 hover:text-[var(--color-text)]"
-                aria-label="Close stop context"
+                aria-label="ปิดข้อมูลป้าย"
               >
                 <X size={16} />
               </button>
@@ -192,10 +326,10 @@ function EmptyArrivalState({ stopName }: { stopName: string }) {
     <div className="px-3 pb-3">
       <div className="rounded-[24px] border border-dashed border-[var(--glass-border)] bg-[var(--color-surface-dark)]/45 px-4 py-6 text-center">
         <p className="text-sm font-semibold text-[var(--color-text)]">
-          No arrival recommendations for {stopName}
+          ยังไม่มีข้อมูลเวลารถถึงสำหรับ {stopName}
         </p>
         <p className="mt-1 text-xs text-[var(--color-text-muted)]">
-          Arrival cards will appear here as soon as ETA data is available.
+          การ์ดรถจะปรากฏเมื่อมีข้อมูล ETA พร้อมใช้งาน
         </p>
       </div>
     </div>
@@ -208,6 +342,7 @@ function BusCard({
   onSelect,
   contextStopName,
   stopEta,
+  autoExpandRequest,
   isAlertEnabled,
   isAlertSupported,
   onToggleAlert,
@@ -217,6 +352,7 @@ function BusCard({
   onSelect: () => void;
   contextStopName?: string;
   stopEta?: Eta;
+  autoExpandRequest?: string | null;
   isAlertEnabled?: boolean;
   isAlertSupported?: boolean;
   onToggleAlert?: () => void;
@@ -232,6 +368,18 @@ function BusCard({
       setIsDropdownOpen(false);
     }
   }, [contextStopName]);
+
+  useEffect(() => {
+    if (!isSelected) {
+      setShowDetails(false);
+    }
+  }, [isSelected]);
+
+  useEffect(() => {
+    if (isSelected && autoExpandRequest) {
+      setShowDetails(true);
+    }
+  }, [autoExpandRequest, isSelected]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -269,7 +417,7 @@ function BusCard({
       : formatDistanceEta(distanceToStopM, tele.speedKmh);
   const density = getDensity(tele.status);
   const routeLabel = `${tele.prevStopName} >> ${toStopName}`;
-  const alertLabel = "Notifications";
+  const alertLabel = "แจ้งเตือน";
   const AlertIcon = isAlertEnabled ? BellRing : Bell;
 
   return (
@@ -308,7 +456,7 @@ function BusCard({
           <div className="flex items-center gap-2">
             <User size={14} style={{ color: density.color }} />
             <span style={{ color: density.color }} className="font-medium">
-              Density: {density.label}
+              ความหนาแน่น: {density.label}
             </span>
             <DensityBars level={density.level} color={density.color} />
           </div>
@@ -355,7 +503,7 @@ function BusCard({
                 <path d="M0 0H18V22L9 17L0 22V0Z" />
               </svg>
             </div>
-            <span>{showDetails ? `Unpin ${tele.label}` : `Pin ${tele.label}`}</span>
+            <span>{showDetails ? "ซ่อนรายละเอียด" : "ดูรายละเอียด"}</span>
           </button>
 
           <div
@@ -380,7 +528,7 @@ function BusCard({
                 <div className="flex min-h-[52px] items-center rounded-[18px] border border-[rgba(126,142,177,0.72)] bg-[rgba(255,255,255,0.02)] px-3 py-2 md:min-h-[54px] md:px-3.5">
                   <div className="min-w-0">
                     <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--text-faint)] md:text-[11px]">
-                      From : <span className="mt-1 text-[0.95rem] normal-case font-semibold leading-tight text-[var(--color-text)] break-words whitespace-normal md:text-base">
+                      จาก : <span className="mt-1 text-[0.95rem] normal-case font-semibold leading-tight text-[var(--color-text)] break-words whitespace-normal md:text-base">
                         {tele.prevStopName}
                       </span>
                     </span>
@@ -397,7 +545,7 @@ function BusCard({
                   >
                     <div className="min-w-0">
                       <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--text-faint)] md:text-[11px]">
-                        To : <span className="mt-1 text-[0.95rem] normal-case font-semibold leading-tight text-[var(--color-text)] break-words whitespace-normal md:text-base">
+                        ถึง : <span className="mt-1 text-[0.95rem] normal-case font-semibold leading-tight text-[var(--color-text)] break-words whitespace-normal md:text-base">
                           {toStopName}
                         </span>
                       </span>
@@ -435,7 +583,7 @@ function BusCard({
                               <span>{stop.name}</span>
                               {isRecommendedOption && (
                                 <span className="rounded-full border border-primary/20 bg-primary/10 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.16em] text-primary">
-                                  Recommended
+                                  แนะนำ
                                 </span>
                               )}
                             </div>
@@ -498,11 +646,14 @@ function BusCard({
       {!isSelected && (
         <div className="-mt-1 px-4 pb-3">
           <button
-            onClick={onSelect}
+            onClick={() => {
+              setShowDetails(true);
+              onSelect();
+            }}
             className="flex w-full items-center justify-center gap-2 rounded-xl border border-[var(--glass-border)] py-2 text-[11px] font-medium text-[var(--text-faint)] transition-all hover:bg-surface-lighter/30"
           >
             <Clock size={12} />
-            Tap for details
+            ดูรายละเอียด
           </button>
         </div>
       )}
@@ -521,6 +672,7 @@ function VehicleListContent({
   stopDistanceM,
   stopKind,
   onClearStop,
+  autoExpandVehicleRequest,
   isAlertEnabled,
   isAlertSupported,
   onToggleAlert,
@@ -533,10 +685,23 @@ function VehicleListContent({
   stopDistanceM?: number;
   stopKind?: "nearest" | "selected" | null;
   onClearStop?: () => void;
+  autoExpandVehicleRequest?: string | null;
   isAlertEnabled?: boolean;
   isAlertSupported?: boolean;
   onToggleAlert?: () => void;
 }) {
+  const listRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!selectedVehicleId || !listRef.current) return;
+
+    const target = listRef.current.querySelector<HTMLElement>(
+      `[data-vehicle-id="${selectedVehicleId}"]`
+    );
+
+    target?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }, [selectedVehicleId]);
+
   return (
     <div className="relative z-10 flex flex-1 flex-col overflow-hidden">
       {stop && (
@@ -549,22 +714,28 @@ function VehicleListContent({
         />
       )}
 
-      <div className="flex-1 space-y-1 overflow-y-auto p-2">
+      <div ref={listRef} className="flex-1 space-y-1 overflow-y-auto p-2">
         {!items.length && stop ? (
           <EmptyArrivalState stopName={stop.name_th} />
         ) : (
           items.map((item) => (
-            <BusCard
-              key={item.key}
-              tele={item.tele}
-              isSelected={selectedVehicleId === item.vehicleId}
-              onSelect={() => onSelectVehicle?.(item.vehicleId)}
-              contextStopName={item.contextStopName}
-              stopEta={item.stopEta}
-              isAlertEnabled={isAlertEnabled}
-              isAlertSupported={isAlertSupported}
-              onToggleAlert={onToggleAlert}
-            />
+            <div key={item.key} data-vehicle-id={item.vehicleId}>
+              <BusCard
+                tele={item.tele}
+                isSelected={selectedVehicleId === item.vehicleId}
+                onSelect={() => onSelectVehicle?.(item.vehicleId)}
+                contextStopName={item.contextStopName}
+                stopEta={item.stopEta}
+                autoExpandRequest={
+                  autoExpandVehicleRequest?.startsWith(`${item.vehicleId}:`)
+                    ? autoExpandVehicleRequest
+                    : null
+                }
+                isAlertEnabled={isAlertEnabled}
+                isAlertSupported={isAlertSupported}
+                onToggleAlert={onToggleAlert}
+              />
+            </div>
           ))
         )}
       </div>
@@ -577,6 +748,9 @@ export function VehiclePanel({
   telemetry,
   onSelectVehicle,
   selectedVehicleId,
+  snapLevel,
+  onSnapLevelChange,
+  autoExpandVehicleRequest,
   stop,
   stopEtas = [],
   stopDistanceM,
@@ -586,7 +760,11 @@ export function VehiclePanel({
   isAlertSupported,
   onToggleAlert,
 }: VehiclePanelProps) {
-  const [snapLevel, setSnapLevel] = useState<0 | 1 | 2>(1);
+  const [internalSnapLevel, setInternalSnapLevel] = useState<0 | 1 | 2>(1);
+  const panelTheme = useMemo(() => getPanelTheme(), []);
+  const currentSnapLevel = snapLevel ?? internalSnapLevel;
+  const mobilePanelHeight =
+    currentSnapLevel === 0 ? MOBILE_HEADER_HEIGHT : currentSnapLevel === 1 ? "52vh" : "85vh";
 
   const items = useMemo<PanelVehicleItem[]>(() => {
     const baseItems = vehicles
@@ -655,8 +833,15 @@ export function VehiclePanel({
     }));
   }, [stop, stopEtas, telemetry, vehicles]);
 
+  const setSnapLevel = (nextLevel: 0 | 1 | 2) => {
+    if (snapLevel === undefined) {
+      setInternalSnapLevel(nextLevel);
+    }
+    onSnapLevelChange?.(nextLevel);
+  };
+
   const handleToggle = () => {
-    setSnapLevel((prev) => ((prev + 1) % 3) as 0 | 1 | 2);
+    setSnapLevel(((currentSnapLevel + 1) % 3) as 0 | 1 | 2);
   };
 
   const renderPanelContent = () => (
@@ -669,6 +854,7 @@ export function VehiclePanel({
       stopDistanceM={stopDistanceM}
       stopKind={stopKind}
       onClearStop={onClearStop}
+      autoExpandVehicleRequest={autoExpandVehicleRequest}
       isAlertEnabled={isAlertEnabled}
       isAlertSupported={isAlertSupported}
       onToggleAlert={onToggleAlert}
@@ -679,41 +865,27 @@ export function VehiclePanel({
     <>
       <div className="absolute right-4 top-4 z-20 hidden max-h-[calc(100vh-2rem)] w-[380px] animate-slideUp flex-col md:flex lg:w-[392px]">
         <div className="glass-card-dark relative flex flex-1 flex-col overflow-hidden border-[var(--panel-border)] bg-[var(--glass-strong-bg)] backdrop-blur-xl">
-          <div className="relative z-10 h-2 w-full rounded-t-[14px] bg-gradient-to-r from-[#FE5050] to-[#C28437]" />
+          <IllustratedPanelHeader theme={panelTheme} />
           {renderPanelContent()}
         </div>
       </div>
 
       <div className="fixed bottom-0 left-0 right-0 z-20 flex h-[90vh] flex-col justify-end pointer-events-none md:hidden">
         <div
-          className={`glass-card-dark pointer-events-auto flex w-full flex-col overflow-hidden rounded-t-2xl border-t border-[var(--panel-border)] bg-[var(--glass-strong-bg)] shadow-[0_-8px_30px_rgba(0,0,0,0.5)] backdrop-blur-xl transition-all duration-300 ease-spring ${snapLevel === 0 ? "h-[60px]" : snapLevel === 1 ? "h-[45vh]" : "h-[85vh]"
-            }`}
+          className="glass-card-dark relative pointer-events-auto flex w-full flex-col overflow-hidden rounded-t-[28px] rounded-b-none border-t border-[var(--panel-border)] bg-[var(--glass-strong-bg)] shadow-[0_-8px_30px_rgba(0,0,0,0.5)] backdrop-blur-xl transition-all duration-300 ease-spring"
+          style={{ height: mobilePanelHeight }}
         >
-          <div
-            className="absolute left-0 right-0 top-0 z-30 h-[60px] cursor-pointer transition-colors active:bg-[var(--map-control-hover)]"
-            onClick={handleToggle}
-          >
-            <div className="h-1.5 w-full bg-gradient-to-r from-[#FE5050] to-[#C28437]" />
-            <div className="flex flex-col items-center justify-center pb-1 pt-2">
-              <div className="mb-1 h-1 w-12 rounded-full bg-[var(--text-faint)]" />
-              {snapLevel === 0 && (
-                <span className="max-w-[75vw] truncate text-[10px] font-bold uppercase tracking-widest text-[var(--text-faint)]">
-                  {stop ? stop.name_th : "Tap to Expand"}
-                </span>
-              )}
-              {snapLevel > 0 && (
-                <ChevronDown
-                  size={16}
-                  className={`mt-1 text-[var(--text-faint)] transition-transform duration-300 ${snapLevel === 2 ? "rotate-180" : ""
-                    }`}
-                />
-              )}
-            </div>
-          </div>
+          <IllustratedPanelHeader
+            theme={panelTheme}
+            mobile
+            snapLevel={currentSnapLevel}
+            onToggle={handleToggle}
+          />
 
           <div
-            className={`mt-[50px] min-h-0 flex-1 transition-opacity duration-300 ${snapLevel > 0 ? "opacity-100" : "pointer-events-none opacity-0"
+            className={`min-h-0 flex-1 transition-opacity duration-300 ${currentSnapLevel > 0 ? "opacity-100" : "pointer-events-none opacity-0"
               }`}
+            style={{ marginTop: MOBILE_HEADER_HEIGHT }}
           >
             {renderPanelContent()}
           </div>

@@ -5,32 +5,127 @@ import { useEffect, useRef, useState } from "react";
 
 import { ThemeToggle } from "./ThemeToggle";
 
+export type HeaderSearchResult = {
+  id: string;
+  type: "vehicle" | "stop";
+  title: string;
+  subtitle?: string;
+};
+
+export type HeaderSearchControls = {
+  value: string;
+  results: HeaderSearchResult[];
+  isOpen: boolean;
+  onValueChange: (value: string) => void;
+  onOpenChange: (open: boolean) => void;
+  onSelect: (result: HeaderSearchResult) => void;
+};
+
 type HeaderProps = {
   isAlertEnabled?: boolean;
   isAlertSupported?: boolean;
   onToggleAlert?: () => void;
+  search?: HeaderSearchControls;
 };
+
+function SearchResultsSection({
+  title,
+  results,
+  onSelect,
+}: {
+  title: string;
+  results: HeaderSearchResult[];
+  onSelect: (result: HeaderSearchResult) => void;
+}) {
+  if (!results.length) return null;
+
+  return (
+    <section>
+      <div className="px-3 pb-2 pt-1">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--text-faint)]">
+          {title}
+        </p>
+      </div>
+
+      <div className="space-y-1">
+        {results.map((result) => (
+          <button
+            key={`${result.type}:${result.id}`}
+            type="button"
+            onClick={() => onSelect(result)}
+            className="flex w-full items-start justify-between gap-3 rounded-[22px] px-3 py-3 text-left transition-colors hover:bg-black/[0.05] dark:hover:bg-white/[0.04]"
+          >
+            <div className="min-w-0">
+              <p className="truncate text-sm font-semibold text-[var(--color-text)]">
+                {result.title}
+              </p>
+              {result.subtitle && (
+                <p className="mt-1 truncate text-xs text-[var(--color-text-muted)]">
+                  {result.subtitle}
+                </p>
+              )}
+            </div>
+
+            <span className="shrink-0 rounded-full border border-primary/20 bg-primary/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-primary">
+              {result.type === "vehicle" ? "รถ" : "ป้าย"}
+            </span>
+          </button>
+        ))}
+      </div>
+    </section>
+  );
+}
 
 export function Header({
   isAlertEnabled = false,
   isAlertSupported = true,
   onToggleAlert,
+  search,
 }: HeaderProps) {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const settingsRef = useRef<HTMLDivElement | null>(null);
+  const searchRef = useRef<HTMLDivElement | null>(null);
+
+  const hasSearchQuery = Boolean(search?.value.trim());
+  const showSearchDropdown = Boolean(search && search.isOpen && hasSearchQuery);
+  const vehicleResults = search?.results.filter((result) => result.type === "vehicle") ?? [];
+  const stopResults = search?.results.filter((result) => result.type === "stop") ?? [];
 
   useEffect(() => {
-    if (!settingsOpen) return;
+    if (!settingsOpen && !search?.isOpen) return;
 
     const handlePointerDown = (event: MouseEvent) => {
-      if (!settingsRef.current?.contains(event.target as Node)) {
+      const target = event.target as Node;
+
+      if (settingsOpen && !settingsRef.current?.contains(target)) {
         setSettingsOpen(false);
+      }
+
+      if (search?.isOpen && !searchRef.current?.contains(target)) {
+        search.onOpenChange(false);
+      }
+    };
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+
+      if (settingsOpen) {
+        setSettingsOpen(false);
+      }
+
+      if (search?.isOpen) {
+        search.onOpenChange(false);
       }
     };
 
     window.addEventListener("mousedown", handlePointerDown);
-    return () => window.removeEventListener("mousedown", handlePointerDown);
-  }, [settingsOpen]);
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      window.removeEventListener("mousedown", handlePointerDown);
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [search, settingsOpen]);
 
   return (
     <header className="pointer-events-none absolute left-0 top-0 z-10 flex w-full flex-col gap-4 bg-gradient-to-b from-white/95 via-white/70 to-transparent px-4 pb-6 pt-6 dark:from-[#111111]/95 dark:via-[#111111]/70 md:left-4 md:top-4 md:w-[380px] md:rounded-3xl md:border md:border-white/20 md:bg-none md:bg-white/90 md:pb-6 md:pt-6 md:shadow-2xl md:backdrop-blur-xl md:dark:border-white/5 md:dark:bg-[#111111]/90">
@@ -97,15 +192,67 @@ export function Header({
         </button>
       </div>
 
-      <div className="pointer-events-auto relative mt-1 w-full rounded-[2rem] border border-gray-100/50 bg-white/95 shadow-[0_8px_24px_rgba(0,0,0,0.06)] backdrop-blur-md dark:border-white/5 dark:bg-[#1f1f1f]/95 dark:shadow-[0_8px_24px_rgba(0,0,0,0.4)] md:bg-gray-50/80 md:shadow-inner md:dark:bg-black/40">
+      <div
+        ref={searchRef}
+        className="pointer-events-auto relative mt-1 w-full rounded-[2rem] border border-gray-100/50 bg-white/95 shadow-[0_8px_24px_rgba(0,0,0,0.06)] backdrop-blur-md dark:border-white/5 dark:bg-[#1f1f1f]/95 dark:shadow-[0_8px_24px_rgba(0,0,0,0.4)] md:bg-gray-50/80 md:shadow-inner md:dark:bg-black/40"
+      >
         <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-5">
           <Search size={18} className="text-gray-400/80" strokeWidth={2} />
         </div>
         <input
           type="text"
-          placeholder="Search"
+          value={search?.value ?? ""}
+          placeholder="ค้นหารถหรือป้าย"
+          readOnly={!search}
+          onChange={(event) => search?.onValueChange(event.target.value)}
+          onFocus={() => {
+            if (search?.value.trim()) {
+              search.onOpenChange(true);
+            }
+          }}
+          aria-expanded={showSearchDropdown}
+          aria-controls={search ? "header-search-results" : undefined}
+          aria-autocomplete={search ? "list" : undefined}
           className="block w-full rounded-[2rem] border-none bg-transparent py-3.5 pl-12 pr-4 text-[15px] placeholder-gray-400/80 focus:outline-none focus:ring-2 focus:ring-primary/50 dark:text-white"
         />
+
+        {showSearchDropdown && (
+          <div
+            id="header-search-results"
+            role="listbox"
+            className="absolute left-0 right-0 top-[calc(100%+0.75rem)] z-40 max-h-[min(55vh,28rem)] overflow-y-auto rounded-[28px] border border-[var(--glass-border)] bg-white/95 p-2 shadow-[0_18px_40px_rgba(0,0,0,0.14)] backdrop-blur-xl dark:bg-[#181b22]/95 dark:shadow-[0_18px_40px_rgba(0,0,0,0.42)]"
+          >
+            {search.results.length > 0 ? (
+              <div className="space-y-2">
+                <SearchResultsSection
+                  title="รถ"
+                  results={vehicleResults}
+                  onSelect={(result) => {
+                    search.onSelect(result);
+                    search.onOpenChange(false);
+                  }}
+                />
+
+                {vehicleResults.length > 0 && stopResults.length > 0 && (
+                  <div className="mx-2 h-px bg-[var(--glass-border)]" />
+                )}
+
+                <SearchResultsSection
+                  title="ป้าย"
+                  results={stopResults}
+                  onSelect={(result) => {
+                    search.onSelect(result);
+                    search.onOpenChange(false);
+                  }}
+                />
+              </div>
+            ) : (
+              <div className="px-4 py-4 text-sm text-[var(--color-text-muted)]">
+                ไม่พบรถหรือป้ายที่ค้นหา
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </header>
   );
