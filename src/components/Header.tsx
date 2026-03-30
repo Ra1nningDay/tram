@@ -86,13 +86,14 @@ export function Header({
   const settingsRef = useRef<HTMLDivElement | null>(null);
   const searchRef = useRef<HTMLDivElement | null>(null);
 
-  const hasSearchQuery = Boolean(search?.value.trim());
-  const showSearchDropdown = Boolean(search && search.isOpen && hasSearchQuery);
-  const vehicleResults = search?.results.filter((result) => result.type === "vehicle") ?? [];
-  const stopResults = search?.results.filter((result) => result.type === "stop") ?? [];
+  const searchControls = search ?? null;
+  const hasSearchQuery = Boolean(searchControls?.value.trim());
+  const showSearchDropdown = Boolean(searchControls && searchControls.isOpen && hasSearchQuery);
+  const vehicleResults = searchControls?.results.filter((result) => result.type === "vehicle") ?? [];
+  const stopResults = searchControls?.results.filter((result) => result.type === "stop") ?? [];
 
   useEffect(() => {
-    if (!settingsOpen && !search?.isOpen) return;
+    if (!settingsOpen && !searchControls?.isOpen) return;
 
     const handlePointerDown = (event: MouseEvent) => {
       const target = event.target as Node;
@@ -101,8 +102,8 @@ export function Header({
         setSettingsOpen(false);
       }
 
-      if (search?.isOpen && !searchRef.current?.contains(target)) {
-        search.onOpenChange(false);
+      if (searchControls?.isOpen && !searchRef.current?.contains(target)) {
+        searchControls.onOpenChange(false);
       }
     };
 
@@ -113,8 +114,8 @@ export function Header({
         setSettingsOpen(false);
       }
 
-      if (search?.isOpen) {
-        search.onOpenChange(false);
+      if (searchControls?.isOpen) {
+        searchControls.onOpenChange(false);
       }
     };
 
@@ -125,7 +126,7 @@ export function Header({
       window.removeEventListener("mousedown", handlePointerDown);
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [search, settingsOpen]);
+  }, [searchControls, settingsOpen]);
 
   return (
     <header className="pointer-events-none absolute left-0 top-0 z-10 flex w-full flex-col gap-4 bg-gradient-to-b from-white/95 via-white/70 to-transparent px-4 pb-6 pt-6 dark:from-[#111111]/95 dark:via-[#111111]/70 md:left-4 md:top-4 md:w-[380px] md:rounded-3xl md:border md:border-white/20 md:bg-none md:bg-white/90 md:pb-6 md:pt-6 md:shadow-2xl md:backdrop-blur-xl md:dark:border-white/5 md:dark:bg-[#111111]/90">
@@ -201,35 +202,35 @@ export function Header({
         </div>
         <input
           type="text"
-          value={search?.value ?? ""}
+          value={searchControls?.value ?? ""}
           placeholder="ค้นหารถหรือป้าย"
-          readOnly={!search}
-          onChange={(event) => search?.onValueChange(event.target.value)}
+          readOnly={!searchControls}
+          onChange={(event) => searchControls?.onValueChange(event.target.value)}
           onFocus={() => {
-            if (search?.value.trim()) {
-              search.onOpenChange(true);
+            if (searchControls?.value.trim()) {
+              searchControls.onOpenChange(true);
             }
           }}
           aria-expanded={showSearchDropdown}
-          aria-controls={search ? "header-search-results" : undefined}
-          aria-autocomplete={search ? "list" : undefined}
+          aria-controls={searchControls ? "header-search-results" : undefined}
+          aria-autocomplete={searchControls ? "list" : undefined}
           className="block w-full rounded-[2rem] border-none bg-transparent py-3.5 pl-12 pr-4 text-[15px] placeholder-gray-400/80 focus:outline-none focus:ring-2 focus:ring-primary/50 dark:text-white"
         />
 
-        {showSearchDropdown && (
+        {showSearchDropdown && searchControls && (
           <div
             id="header-search-results"
             role="listbox"
             className="absolute left-0 right-0 top-[calc(100%+0.75rem)] z-40 max-h-[min(55vh,28rem)] overflow-y-auto rounded-[28px] border border-[var(--glass-border)] bg-white/95 p-2 shadow-[0_18px_40px_rgba(0,0,0,0.14)] backdrop-blur-xl dark:bg-[#181b22]/95 dark:shadow-[0_18px_40px_rgba(0,0,0,0.42)]"
           >
-            {search.results.length > 0 ? (
+            {searchControls.results.length > 0 ? (
               <div className="space-y-2">
                 <SearchResultsSection
                   title="รถ"
                   results={vehicleResults}
                   onSelect={(result) => {
-                    search.onSelect(result);
-                    search.onOpenChange(false);
+                    searchControls.onSelect(result);
+                    searchControls.onOpenChange(false);
                   }}
                 />
 
@@ -241,8 +242,8 @@ export function Header({
                   title="ป้าย"
                   results={stopResults}
                   onSelect={(result) => {
-                    search.onSelect(result);
-                    search.onOpenChange(false);
+                    searchControls.onSelect(result);
+                    searchControls.onOpenChange(false);
                   }}
                 />
               </div>
