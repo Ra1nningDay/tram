@@ -279,7 +279,7 @@ function StopContextHeader({
                 </span>
               </div>
 
-              <h3 className="truncate font-heading text-[1.9rem] font-bold leading-none tracking-[-0.04em] text-[var(--color-text)]">
+              <h3 className="overflow-hidden pb-1 text-ellipsis whitespace-nowrap text-[1.9rem] font-semibold leading-[1.2] tracking-normal text-[var(--color-text)]">
                 {title}
               </h3>
               {/* <p className="mt-1 truncate text-sm text-[var(--color-text-muted)]">
