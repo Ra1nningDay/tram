@@ -18,6 +18,7 @@ import {
 import { startTransition, useEffect, useState } from "react";
 
 import { cn } from "@/lib/utils";
+import { useGpsReporter } from "@/features/shuttle/useGpsReporter";
 
 const kanit = Kanit({
   subsets: ["thai", "latin"],
@@ -59,6 +60,13 @@ const VEHICLE_LIST = [
   { id: "TRAM-2", name: "TRAM-2", status: "สายที่ 2: หอประชุม", isOnline: false },
   { id: "TRAM-8", name: "TRAM-8", status: "สายที่ 1: อาคารหลัก", isOnline: true },
 ] as const;
+
+// Map route label → direction for the GPS ingest payload
+const ROUTE_DIRECTION_MAP: Record<string, "outbound" | "inbound"> = {
+  "สายที่ 1 : สายหลัก": "outbound",
+  "สายที่ 2 : หอประชุม": "outbound",
+  "สายที่ 3 : ศูนย์กีฬา": "outbound",
+};
 
 const DRIVER_NAME = "นายณัฐวัฒน์ แซ่ตั้ง";
 
@@ -274,6 +282,16 @@ export function DriverDemoScreen() {
   const [issueDetails, setIssueDetails] = useState("");
   const [now, setNow] = useState(() => Date.now());
   const [startedAt, setStartedAt] = useState<number | null>(null);
+
+  // ── GPS Reporting ──────────────────────────────────────────────────────────
+  // Automatically starts when mode goes from "off" → "available"
+  // and stops when driver taps "หยุดทำงาน" (mode → "off")
+  useGpsReporter({
+    enabled: mode !== "off",
+    vehicleId: selectedVehicle,
+    vehicleLabel: selectedVehicle,
+    direction: ROUTE_DIRECTION_MAP[ROUTE_OPTIONS[routeIndex]] ?? "outbound",
+  });
 
   useEffect(() => {
     const intervalId = window.setInterval(() => {

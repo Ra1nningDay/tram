@@ -8,7 +8,7 @@ import shuttleData from "../data/shuttle-data.json";
 /*  Tram metadata                                                      */
 /* ------------------------------------------------------------------ */
 
-const TRAM_FILES = [
+export const TRAM_FILES = [
     { id: "tram-1", label: "BUS_1", url: "/data/tram_1.csv", color: "#FE5050" },
     { id: "tram-2", label: "BUS_2", url: "/data/tram_2.csv", color: "#FE5050" },
     { id: "tram-3", label: "BUS_3", url: "/data/tram_3.csv", color: "#FE5050" },
@@ -27,10 +27,10 @@ const TELEMETRY_THROTTLE_MS = 500;
 /*  Route polyline with cumulative distances                           */
 /* ------------------------------------------------------------------ */
 
-const ROUTE_COORDS: [number, number][] =
+export const ROUTE_COORDS: [number, number][] =
     (shuttleData.routes[0]?.directions[0]?.geometry?.coordinates ?? []) as [number, number][];
 
-const ROUTE_CUM_DIST: number[] = [];
+export const ROUTE_CUM_DIST: number[] = [];
 {
     let d = 0;
     ROUTE_CUM_DIST.push(0);
@@ -39,7 +39,7 @@ const ROUTE_CUM_DIST: number[] = [];
         ROUTE_CUM_DIST.push(d);
     }
 }
-const ROUTE_TOTAL_M = ROUTE_CUM_DIST[ROUTE_CUM_DIST.length - 1] ?? 0;
+export const ROUTE_TOTAL_M = ROUTE_CUM_DIST[ROUTE_CUM_DIST.length - 1] ?? 0;
 
 /* ------------------------------------------------------------------ */
 /*  Stop positions                                                     */
@@ -51,7 +51,8 @@ export interface StopOnRoute {
     distanceM: number;
 }
 
-function projectStopToRoute(lat: number, lng: number): number {
+/** Project any GPS lat/lng onto the route polyline, returning distance in metres from start. */
+export function projectGpsToRoute(lat: number, lng: number): number {
     let bestDist2 = Infinity;
     let bestRouteDist = 0;
     for (let i = 0; i < ROUTE_COORDS.length - 1; i++) {
@@ -79,14 +80,14 @@ function projectStopToRoute(lat: number, lng: number): number {
 export const STOPS_ON_ROUTE: StopOnRoute[] = (shuttleData.stops ?? []).map((s) => ({
     id: s.id,
     name: s.name_th,
-    distanceM: projectStopToRoute(s.latitude, s.longitude),
+    distanceM: projectGpsToRoute(s.latitude, s.longitude),
 })).sort((a, b) => a.distanceM - b.distanceM);
 
 /* ------------------------------------------------------------------ */
 /*  Position at distance                                               */
 /* ------------------------------------------------------------------ */
 
-function positionAtDistance(distM: number): { lng: number; lat: number; heading: number } {
+export function positionAtDistance(distM: number): { lng: number; lat: number; heading: number } {
     const d = ((distM % ROUTE_TOTAL_M) + ROUTE_TOTAL_M) % ROUTE_TOTAL_M;
 
     let lo = 0;
@@ -129,7 +130,7 @@ export interface VehicleTelemetry {
     status: "normal" | "warning";
 }
 
-function computeTelemetry(
+export function computeTelemetry(
     vehicleId: string, label: string, distanceM: number, speedKmh: number,
 ): VehicleTelemetry {
     const d = ((distanceM % ROUTE_TOTAL_M) + ROUTE_TOTAL_M) % ROUTE_TOTAL_M;
@@ -163,7 +164,7 @@ function computeTelemetry(
 /*  Per-tram cursor                                                    */
 /* ------------------------------------------------------------------ */
 
-interface TramCursor {
+export interface TramCursor {
     id: string;
     label: string;
     color: string;
@@ -174,7 +175,7 @@ interface TramCursor {
     currentSpeedKmh: number;
 }
 
-function initCursor(
+export function initCursor(
     id: string, label: string, color: string,
     gpsPoints: GpsPoint[], startFraction: number,
 ): TramCursor {
@@ -240,7 +241,7 @@ function advanceCursorMut(cursor: TramCursor, realDeltaMs: number): {
 /*  GeoJSON builder — reuses a single object to reduce GC pressure     */
 /* ------------------------------------------------------------------ */
 
-function buildVehicleFeature(
+export function buildVehicleFeature(
     id: string, label: string, lng: number, lat: number, heading: number,
 ) {
     const rawHeading = ((heading % 360) + 360) % 360;

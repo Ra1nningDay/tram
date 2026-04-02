@@ -12,7 +12,7 @@ import { getCampusViewport } from "../features/map/campus-viewport";
 import { useRoute, useStops } from "../features/shuttle/hooks";
 import { useSimulatedInsights } from "../features/shuttle/useSimulatedInsights";
 import { useArrivalAlert } from "../hooks/useArrivalAlert";
-import { useGpsReplay } from "../hooks/useGpsReplay";
+import { useLiveOrSimVehicles } from "../hooks/useLiveOrSimVehicles";
 import { useNearestStop } from "../hooks/useNearestStop";
 import { useUserLocation } from "../hooks/useUserLocation";
 import { haversineM } from "../lib/geo/distance";
@@ -93,7 +93,7 @@ export function MapPage() {
   const allStops = stopsData?.stops;
   const isMobile = typeof window !== "undefined" ? window.innerWidth < 768 : false;
   const initialBearing = isMobile ? (campusConfig.initialBearing ?? 0) : 0;
-  const { vehicles, telemetry, loading, setMapUpdater } = useGpsReplay(initialBearing);
+  const { vehicles, telemetry, loading, setMapUpdater } = useLiveOrSimVehicles(initialBearing);
   const {
     location: userLocation,
     isTracking: isTrackingLocation,

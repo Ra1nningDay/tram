@@ -151,3 +151,21 @@ model MapConfig {
 
   @@map("map_config")
 }
+
+// ── GPS History ──────────────────────────────────────────────────────────────
+
+model VehicleLocation {
+  id         String   @id @default(cuid())
+  vehicleId  String
+  label      String?
+  latitude   Float
+  longitude  Float
+  heading    Float?
+  speed      Float?
+  source     String   // "hardware" | "driver"
+  recordedAt DateTime @default(now())
+
+  @@index([vehicleId, recordedAt(sort: Desc)])
+  @@index([recordedAt(sort: Desc)])
+  @@map("vehicle_locations")
+}

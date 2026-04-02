@@ -1,7 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
 import type { Route, Stop, Vehicle, Eta } from "./api";
 
-const REFRESH_MS = 3000;
+const REFRESH_MS = 5000; // Fallback polling (SSE is the primary real-time channel)
+
 
 async function request<T>(path: string): Promise<T> {
   const res = await fetch(path);
