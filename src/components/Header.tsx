@@ -129,7 +129,7 @@ export function Header({
   }, [searchControls, settingsOpen]);
 
   return (
-    <header className="pointer-events-none absolute left-0 top-0 z-10 flex w-full flex-col gap-4 bg-gradient-to-b from-white/95 via-white/70 to-transparent px-4 pb-6 pt-6 dark:from-[#111111]/95 dark:via-[#111111]/70 md:left-4 md:top-4 md:w-[380px] md:rounded-3xl md:border md:border-white/20 md:bg-none md:bg-white/90 md:pb-6 md:pt-6 md:shadow-2xl md:backdrop-blur-xl md:dark:border-white/5 md:dark:bg-[#111111]/90">
+    <header className="pointer-events-none absolute left-0 top-0 z-10 flex w-full flex-col gap-4 bg-gradient-to-b from-white/95 via-white/70 to-transparent px-4 pb-6 pt-6 dark:from-[#111111]/95 dark:via-[#111111]/70 md:left-3 md:top-3 md:w-[340px] md:rounded-3xl md:border md:border-white/20 md:bg-none md:bg-white/90 md:pb-5 md:pt-5 md:shadow-2xl md:backdrop-blur-xl md:dark:border-white/5 md:dark:bg-[#111111]/90 lg:left-4 lg:top-4 lg:w-[380px] lg:pb-6 lg:pt-6 xl:w-[420px]">
       <div className="pointer-events-auto flex w-full items-center justify-between">
         <div ref={settingsRef} className="relative">
           <button
@@ -177,13 +177,12 @@ export function Header({
                 ? "Turn off arrival alerts"
                 : "Turn on arrival alerts"
           }
-          className={`pointer-events-auto flex h-10 w-10 items-center justify-center rounded-full border shadow-[0_2px_8px_rgba(0,0,0,0.04)] transition-colors ${
-            isAlertEnabled
-              ? "border-orange-200 bg-orange-100 text-orange-500 hover:bg-orange-200 dark:border-orange-500/30 dark:bg-orange-500/20 dark:hover:bg-orange-500/30"
-              : !isAlertSupported
-                ? "border-orange-100 bg-orange-50 text-orange-300 dark:border-orange-500/10 dark:bg-orange-500/5 dark:text-orange-500/60"
-                : "border-orange-100 bg-orange-50 text-orange-400 hover:bg-orange-100 dark:border-orange-500/20 dark:bg-orange-500/10 dark:hover:bg-orange-500/20"
-          }`}
+          className={`pointer-events-auto flex h-10 w-10 items-center justify-center rounded-full border shadow-[0_2px_8px_rgba(0,0,0,0.04)] transition-colors ${isAlertEnabled
+            ? "border-orange-200 bg-orange-100 text-orange-500 hover:bg-orange-200 dark:border-orange-500/30 dark:bg-orange-500/20 dark:hover:bg-orange-500/30"
+            : !isAlertSupported
+              ? "border-orange-100 bg-orange-50 text-orange-300 dark:border-orange-500/10 dark:bg-orange-500/5 dark:text-orange-500/60"
+              : "border-orange-100 bg-orange-50 text-orange-400 hover:bg-orange-100 dark:border-orange-500/20 dark:bg-orange-500/10 dark:hover:bg-orange-500/20"
+            }`}
         >
           {isAlertEnabled ? (
             <Bell size={18} strokeWidth={2.5} />

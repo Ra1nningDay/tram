@@ -19,6 +19,11 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
+# Provide a dummy DATABASE_URL for Prisma generate during the build stage.
+# It won't actually connect to the DB, just needs to pass schema parsing.
+ENV DATABASE_URL="postgresql://dummy:dummy@localhost:5432/dummy"
+ENV DIRECT_URL="postgresql://dummy:dummy@localhost:5432/dummy"
+
 RUN pnpm build
 
 FROM base AS runner

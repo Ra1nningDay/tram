@@ -93,7 +93,8 @@ export function MapPage() {
   const allStops = stopsData?.stops;
   const isMobile = typeof window !== "undefined" ? window.innerWidth < 768 : false;
   const initialBearing = isMobile ? (campusConfig.initialBearing ?? 0) : 0;
-  const { vehicles, telemetry, loading, setMapUpdater } = useLiveOrSimVehicles(initialBearing);
+  const [dataMode, setDataMode] = useState<"live" | "simulate">("simulate");
+  const { vehicles, telemetry, loading, setMapUpdater } = useLiveOrSimVehicles(initialBearing, dataMode);
   const {
     location: userLocation,
     isTracking: isTrackingLocation,
@@ -639,6 +640,22 @@ export function MapPage() {
         onToggleAlert={handleToggleAlert}
         search={headerSearch}
       />
+
+      <div className="absolute right-4 top-[88px] z-40 md:right-[360px] lg:right-[400px] xl:right-[440px]">
+        <button
+          onClick={() => setDataMode((prev) => (prev === "simulate" ? "live" : "simulate"))}
+          className="flex items-center gap-2 rounded-full bg-surface-lighter/90 px-4 py-2 text-sm font-medium text-white shadow-lg backdrop-blur-md transition-colors hover:bg-surface-light border border-white/10"
+        >
+          <div
+            className={`h-2.5 w-2.5 rounded-full ${
+              dataMode === "live"
+                ? "bg-green-500 animate-pulse shadow-[0_0_8px_rgba(34,197,94,0.6)]"
+                : "bg-primary shadow-[0_0_8px_rgba(254,80,80,0.6)]"
+            }`}
+          />
+          {dataMode === "live" ? "Live GPS Mode" : "Simulate Mode"}
+        </button>
+      </div>
 
       {loading && <MapLoadingOverlay />}
 

@@ -46,6 +46,9 @@ export async function GET() {
 
       try {
         localSub = redisSubscriber.duplicate();
+        // Since lazyConnect: true is enabled in our configuration,
+        // we MUST explicitly connect before calling subscribe when enableOfflineQueue: false.
+        await localSub.connect();
         await localSub.subscribe(CHANNEL_VEHICLES);
 
         localSub.on("message", (_channel: string, message: string) => {

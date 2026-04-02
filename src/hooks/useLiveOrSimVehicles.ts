@@ -124,10 +124,13 @@ function advanceCursorMut(
  * • **Simulation mode** (no live data):
  *     Falls back to the original CSV-replay animation unchanged.
  */
-export function useLiveOrSimVehicles(initialBearing: number = 0): GpsReplayState {
+export function useLiveOrSimVehicles(
+    initialBearing: number = 0,
+    mode: "live" | "simulate" = "simulate",
+): GpsReplayState {
     // ── SSE stream ────────────────────────────────────────────────────
     const { vehicles: streamVehicles } = useVehicleStream();
-    const hasLiveData = streamVehicles.length > 0;
+    const hasLiveData = mode === "live";
 
     // ── Shared map updater ref (stable across mode switches) ──────────
     const mapUpdaterRef = useRef<MapSourceUpdater | null>(null);
@@ -144,6 +147,7 @@ export function useLiveOrSimVehicles(initialBearing: number = 0): GpsReplayState
     // ── Simulation state ──────────────────────────────────────────────
     const simCursorsRef = useRef<TramCursor[]>([]);
     const simLoadedRef = useRef(false);
+    const [simLoaded, setSimLoaded] = useState(false);
 
     // ── Live cursor map ───────────────────────────────────────────────
     const liveCursorsRef = useRef<Map<string, LiveCursor>>(new Map());
@@ -175,6 +179,7 @@ export function useLiveOrSimVehicles(initialBearing: number = 0): GpsReplayState
             if (cancelled) return;
             simCursorsRef.current = results;
             simLoadedRef.current = true;
+            setSimLoaded(true);
             if (!hasLiveData) {
                 setLoading(false);
             }
@@ -300,7 +305,9 @@ export function useLiveOrSimVehicles(initialBearing: number = 0): GpsReplayState
 
         // Fast path: update MapLibre GeoJSON source directly (bypasses React)
         const updater = mapUpdaterRef.current;
-        if (updater) updater({ type: "FeatureCollection", features });
+        if (updater) {
+            updater({ type: "FeatureCollection", features });
+        }
 
         // Slow path: update React state for VehiclePanel (throttled)
         if (now - lastTelemetryRef.current > TELEMETRY_THROTTLE_MS) {
@@ -323,7 +330,7 @@ export function useLiveOrSimVehicles(initialBearing: number = 0): GpsReplayState
         rafRef.current = requestAnimationFrame(tick);
 
         return () => cancelAnimationFrame(rafRef.current);
-    }, [hasLiveData, tick]);
+    }, [hasLiveData, tick, simLoaded]);
 
     return {
         vehicles,

@@ -95,7 +95,8 @@ type PanelTheme = {
 };
 
 const MOBILE_HEADER_HEIGHT = 126;
-const DESKTOP_HEADER_HEIGHT = 122;
+const DESKTOP_HEADER_HEIGHT = 110;
+const DESKTOP_LG_HEADER_HEIGHT = 122;
 
 function getPanelTheme(date = new Date()): PanelTheme {
   const hour = date.getHours();
@@ -157,7 +158,7 @@ function IllustratedPanelHeader({
 
       <div className={`absolute left-5 z-20 ${mobile ? "top-[22px]" : "top-[16px]"}`}>
         <h2
-          className={`font-heading font-bold leading-none tracking-[-0.04em] text-white drop-shadow-[0_3px_10px_rgba(0,0,0,0.22)] ${mobile ? "text-[1.45rem]" : "text-[1.65rem]"
+          className={`font-heading font-bold leading-none tracking-[-0.04em] text-white drop-shadow-[0_3px_10px_rgba(0,0,0,0.22)] ${mobile ? "text-[1.45rem]" : "text-[1.35rem] lg:text-[1.65rem]"
             }`}
         >
           ดูรอบรถ
@@ -171,8 +172,8 @@ function IllustratedPanelHeader({
           aria-hidden="true"
           width={131}
           height={65}
-          sizes={mobile ? "118px" : "126px"}
-          className={`${mobile ? "w-[118px]" : "w-[126px]"} h-auto`}
+          sizes={mobile ? "118px" : "110px"}
+          className={`${mobile ? "w-[118px]" : "w-[100px] lg:w-[126px]"} h-auto`}
         />
       </div>
 
@@ -183,8 +184,8 @@ function IllustratedPanelHeader({
           aria-hidden="true"
           width={115}
           height={85}
-          sizes={mobile ? "122px" : "132px"}
-          className={`${mobile ? "w-[122px]" : "w-[132px]"} h-auto`}
+          sizes={mobile ? "122px" : "115px"}
+          className={`${mobile ? "w-[122px]" : "w-[105px] lg:w-[132px]"} h-auto`}
         />
       </div>
     </>
@@ -421,30 +422,33 @@ function BusCard({
   const AlertIcon = isAlertEnabled ? BellRing : Bell;
 
   return (
-    <div className="relative">
+    <div
+      className={`relative transition-colors duration-300 rounded-[24px] ${isSelected ? "bg-surface-light shadow-lg" : ""
+        }`}
+    >
       <button
         onClick={onSelect}
-        className={`bus-card group relative w-full overflow-hidden rounded-2xl p-4 text-left transition-all ${isSelected
-          ? "bg-surface-light/10"
+        className={`bus-card group relative w-full overflow-hidden rounded-[24px] p-3 text-left transition-all lg:p-4 ${isSelected
+          ? "![background:transparent] !translate-x-0 cursor-default"
           : "bg-transparent hover:bg-[var(--map-control-hover)]"
           }`}
       >
-        <div className="mb-2 flex items-center gap-3">
-          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border-2 border-[var(--text-faint)] bg-transparent">
+        <div className="mb-1.5 flex items-center gap-2.5 lg:mb-2 lg:gap-3">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border-2 border-[var(--text-faint)] bg-transparent lg:h-11 lg:w-11">
             <Bus
-              size={24}
-              className="text-[var(--color-text)]"
+              size={20}
+              className="text-[var(--color-text)] lg:h-6 lg:w-6"
               strokeWidth={1.5}
             />
           </div>
 
           <div className="min-w-0 flex-1">
-            <h3 className="font-heading text-xl font-bold leading-tight tracking-wide text-[var(--color-text)]">
+            <h3 className="font-heading text-lg font-bold leading-tight tracking-wide text-[var(--color-text)] lg:text-xl">
               {tele.label}
             </h3>
           </div>
 
-          <div className="flex shrink-0 items-center gap-1.5 rounded-full border border-primary/40 bg-primary/10 px-3 py-1.5">
+          <div className="flex shrink-0 items-center gap-1.5 rounded-full border border-primary/40 bg-primary/10 px-2.5 py-1 lg:px-3 lg:py-1.5">
             <Clock size={12} className="text-primary" />
             <span className="whitespace-nowrap text-xs font-semibold text-primary">
               {etaLabel}
@@ -452,7 +456,7 @@ function BusCard({
           </div>
         </div>
 
-        <div className="mb-3 flex items-center justify-between px-1 text-xs">
+        <div className="mb-2 flex items-center justify-between px-1 text-[11px] lg:mb-3 lg:text-xs">
           <div className="flex items-center gap-2">
             <User size={14} style={{ color: density.color }} />
             <span style={{ color: density.color }} className="font-medium">
@@ -465,22 +469,24 @@ function BusCard({
           </span>
         </div>
 
-        <div className="relative mx-1 h-1.5 rounded-full bg-surface-lighter">
-          <div
-            className="absolute left-0 top-0 flex h-full items-center rounded-l-full bg-gradient-to-r from-primary-dark to-primary transition-all duration-500 ease-out"
-            style={{ width: `${Math.max(5, tele.progressPercent)}%` }}
-          >
-            <div className="absolute right-[-6px] top-1/2 z-10 -translate-y-1/2 filter drop-shadow-[0_0_4px_rgba(254,80,80,0.6)]">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="white">
-                <path d="M21 12l-18 12v-24z" />
-              </svg>
+        {showDetails && (
+          <div className="relative mx-1 mt-3 mb-1 h-1.5 rounded-full bg-surface-lighter">
+            <div
+              className="absolute left-0 top-0 flex h-full items-center rounded-l-full bg-gradient-to-r from-primary-dark to-primary transition-all duration-500 ease-out"
+              style={{ width: `${Math.max(5, tele.progressPercent)}%` }}
+            >
+              <div className="absolute right-[-6px] top-1/2 z-10 -translate-y-1/2 filter drop-shadow-[0_0_4px_rgba(254,80,80,0.6)]">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="white">
+                  <path d="M21 12l-18 12v-24z" />
+                </svg>
+              </div>
             </div>
           </div>
-        </div>
+        )}
       </button>
 
       {isSelected && (
-        <div className="mt-1.5 space-y-2 pb-2 pt-1.5">
+        <div className="mt-[-4px] space-y-3 px-3 pb-4">
           <button
             onClick={(event) => {
               event.stopPropagation();
@@ -508,7 +514,7 @@ function BusCard({
 
           <div
             ref={dropdownRef}
-            className={`px-1 transition-all duration-300 sm:px-3 ${showDetails
+            className={`transition-all duration-300 sm:px-3 ${showDetails
               ? "max-h-[420px] opacity-100"
               : "max-h-0 overflow-hidden opacity-0"
               }`}
@@ -863,7 +869,7 @@ export function VehiclePanel({
 
   return (
     <>
-      <div className="absolute right-4 top-4 z-20 hidden max-h-[calc(100vh-2rem)] w-[380px] animate-slideUp flex-col md:flex lg:w-[392px]">
+      <div className="absolute right-3 top-3 z-20 hidden max-h-[calc(100vh-1.5rem)] w-[340px] animate-slideUp flex-col md:flex lg:right-4 lg:top-4 lg:max-h-[calc(100vh-2rem)] lg:w-[380px] xl:w-[420px]">
         <div className="glass-card-dark relative flex flex-1 flex-col overflow-hidden border-[var(--panel-border)] bg-[var(--glass-strong-bg)] backdrop-blur-xl">
           <IllustratedPanelHeader theme={panelTheme} />
           {renderPanelContent()}

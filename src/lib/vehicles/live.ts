@@ -35,16 +35,8 @@ function getMockVehicleFeed(now = Date.now()): Vehicle[] {
 
 // ── Live Feed ────────────────────────────────────────────────────────────────
 
-/**
- * Returns the current vehicle snapshot.
- * - When GPS data has been ingested → returns live store data.
- * - When store is empty (dev/cold start) → falls back to mock data.
- */
 export function getLiveVehicleFeed(now = Date.now()): Vehicle[] {
-  if (hasLiveVehicles()) {
-    return getAllVehicles();
-  }
-  return getMockVehicleFeed(now);
+  return getAllVehicles();
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
