@@ -135,17 +135,17 @@ export function MapPage() {
   const selectedStopDistanceM =
     userLocation && selectedStop
       ? haversineM(
-          [userLocation.longitude, userLocation.latitude],
-          [selectedStop.longitude, selectedStop.latitude]
-        )
+        [userLocation.longitude, userLocation.latitude],
+        [selectedStop.longitude, selectedStop.latitude]
+      )
       : undefined;
   const proximityStop = selectedStop ?? nearestStop;
   const proximityStopDistanceM =
     userLocation && proximityStop
       ? haversineM(
-          [userLocation.longitude, userLocation.latitude],
-          [proximityStop.longitude, proximityStop.latitude]
-        )
+        [userLocation.longitude, userLocation.latitude],
+        [proximityStop.longitude, proximityStop.latitude]
+      )
       : undefined;
   const selectedStopName = selectedStop?.name_th ?? selectedStop?.name_en;
   const selectedStopKind = selectedStop
@@ -501,6 +501,10 @@ export function MapPage() {
     focusStopFromSearch(result.id);
   }, [focusStopFromSearch, focusVehicleFromSearch]);
 
+  const handleToggleDataMode = useCallback(() => {
+    setDataMode((prev) => (prev === "simulate" ? "live" : "simulate"));
+  }, []);
+
   const headerSearch = useMemo(() => ({
     value: searchQuery,
     results: searchResults.map((result) => ({
@@ -638,24 +642,10 @@ export function MapPage() {
         isAlertEnabled={isAlertEnabled}
         isAlertSupported={isAlertSupported}
         onToggleAlert={handleToggleAlert}
+        dataMode={dataMode}
+        onToggleDataMode={handleToggleDataMode}
         search={headerSearch}
       />
-
-      <div className="absolute right-4 top-[88px] z-40 md:right-[360px] lg:right-[400px] xl:right-[440px]">
-        <button
-          onClick={() => setDataMode((prev) => (prev === "simulate" ? "live" : "simulate"))}
-          className="flex items-center gap-2 rounded-full bg-surface-lighter/90 px-4 py-2 text-sm font-medium text-white shadow-lg backdrop-blur-md transition-colors hover:bg-surface-light border border-white/10"
-        >
-          <div
-            className={`h-2.5 w-2.5 rounded-full ${
-              dataMode === "live"
-                ? "bg-green-500 animate-pulse shadow-[0_0_8px_rgba(34,197,94,0.6)]"
-                : "bg-primary shadow-[0_0_8px_rgba(254,80,80,0.6)]"
-            }`}
-          />
-          {dataMode === "live" ? "Live GPS Mode" : "Simulate Mode"}
-        </button>
-      </div>
 
       {loading && <MapLoadingOverlay />}
 

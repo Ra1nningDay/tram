@@ -25,6 +25,8 @@ type HeaderProps = {
   isAlertEnabled?: boolean;
   isAlertSupported?: boolean;
   onToggleAlert?: () => void;
+  dataMode?: "live" | "simulate";
+  onToggleDataMode?: () => void;
   search?: HeaderSearchControls;
 };
 
@@ -80,6 +82,8 @@ export function Header({
   isAlertEnabled = false,
   isAlertSupported = true,
   onToggleAlert,
+  dataMode = "simulate",
+  onToggleDataMode,
   search,
 }: HeaderProps) {
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -146,18 +150,49 @@ export function Header({
           {settingsOpen && (
             <div
               role="menu"
-              className="glass-card pointer-events-auto absolute left-0 top-[calc(100%+0.75rem)] z-40 w-[220px] rounded-[22px] border border-[var(--glass-border)] bg-white/95 p-3 shadow-[0_16px_36px_rgba(0,0,0,0.16)] backdrop-blur-xl dark:bg-[#181b22]/95 dark:shadow-[0_18px_40px_rgba(0,0,0,0.42)]"
+              className="glass-card pointer-events-auto absolute left-0 top-[calc(100%+0.75rem)] z-40 w-[260px] rounded-[22px] border border-[var(--glass-border)] bg-white/95 p-3 shadow-[0_16px_36px_rgba(0,0,0,0.16)] backdrop-blur-xl dark:bg-[#181b22]/95 dark:shadow-[0_18px_40px_rgba(0,0,0,0.42)]"
             >
               <div className="mb-3 border-b border-[var(--glass-border)]/80 pb-2.5">
                 <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[var(--text-faint)]">
                   Settings
                 </p>
-                <p className="mt-1 text-sm font-medium text-[var(--color-text)]">
-                  Appearance
-                </p>
               </div>
 
-              <ThemeToggle mode="inline" onSelect={() => setSettingsOpen(false)} />
+              <div className="space-y-3">
+                <div>
+                  <p className="mb-2 text-sm font-medium text-[var(--color-text)]">
+                    Appearance
+                  </p>
+                  <ThemeToggle mode="inline" onSelect={() => setSettingsOpen(false)} />
+                </div>
+
+                {onToggleDataMode && (
+                  <div className="border-t border-[var(--glass-border)]/80 pt-3">
+                    <p className="mb-2 text-sm font-medium text-[var(--color-text)]">
+                      Vehicle Data
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onToggleDataMode();
+                        setSettingsOpen(false);
+                      }}
+                      className="flex w-full items-center justify-between gap-2 rounded-full bg-surface-lighter/90 px-4 py-2 text-sm font-medium text-white shadow-lg backdrop-blur-md transition-colors hover:bg-surface-light border border-white/10"
+                    >
+                      <span className="flex items-center gap-2">
+                        <span
+                          className={`h-2.5 w-2.5 rounded-full ${
+                            dataMode === "live"
+                              ? "animate-pulse bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]"
+                              : "bg-primary shadow-[0_0_8px_rgba(254,80,80,0.6)]"
+                          }`}
+                        />
+                        {dataMode === "live" ? "Live GPS Mode" : "Simulate Mode"}
+                      </span>
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
           )}
         </div>
