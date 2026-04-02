@@ -1,4 +1,4 @@
-name: Deploy Production To VM
+name: Publish Production Deploy State
 
 on:
   push:
@@ -23,6 +23,7 @@ jobs:
     outputs:
       image_name: ${{ steps.meta.outputs.image_name }}
       image_tag: ${{ steps.meta.outputs.image_tag }}
+      image_digest: ${{ steps.build.outputs.digest }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -47,6 +48,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build and push production image
+        id: build
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -57,67 +59,60 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-  deploy:
+  publish-deploy-state:
     needs: build-and-push
     runs-on: ubuntu-latest
     environment: production
     permissions:
-      contents: read
+      contents: write
     env:
-      VM_HOST: ${{ secrets.VM_HOST }}
-      VM_PORT: ${{ secrets.VM_PORT }}
-      VM_USER: ${{ secrets.VM_USER }}
-      VM_DEPLOY_PATH: ${{ secrets.VM_DEPLOY_PATH }}
-      VM_SSH_KNOWN_HOSTS: ${{ secrets.VM_SSH_KNOWN_HOSTS }}
-      GHCR_USERNAME: ${{ secrets.GHCR_USERNAME }}
-      GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
-      APP_ENV_FILE: ${{ secrets.APP_ENV_FILE }}
       IMAGE_NAME: ${{ needs.build-and-push.outputs.image_name }}
-      IMAGE_TAG: ${{ needs.build-and-push.outputs.image_tag }}
+      IMAGE_DIGEST: ${{ needs.build-and-push.outputs.image_digest }}
+      SOURCE_SHA: ${{ github.sha }}
+      DEPLOY_BRANCH: deploy-state
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-      - name: Configure SSH
+      - name: Publish runtime bundle to deploy-state
         shell: bash
         env:
-          VM_SSH_KEY: ${{ secrets.VM_SSH_KEY }}
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
-          install -m 700 -d ~/.ssh
-          printf '%s\n' "${VM_SSH_KEY}" > ~/.ssh/id_ed25519
-          chmod 600 ~/.ssh/id_ed25519
+          set -euo pipefail
 
-          if [ -n "${VM_SSH_KNOWN_HOSTS}" ]; then
-            printf '%s\n' "${VM_SSH_KNOWN_HOSTS}" > ~/.ssh/known_hosts
+          state_dir="${RUNNER_TEMP}/deploy-state"
+          repo_url="https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          image_ref="${IMAGE_NAME}@${IMAGE_DIGEST}"
+          updated_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+
+          if git ls-remote --exit-code --heads "${repo_url}" "${DEPLOY_BRANCH}" >/dev/null 2>&1; then
+            git clone --branch "${DEPLOY_BRANCH}" --depth 1 "${repo_url}" "${state_dir}"
           else
-            ssh-keyscan -p "${VM_PORT:-22}" "${VM_HOST}" >> ~/.ssh/known_hosts
+            git clone --depth 1 "${repo_url}" "${state_dir}"
+            git -C "${state_dir}" checkout --orphan "${DEPLOY_BRANCH}"
+            git -C "${state_dir}" rm -rf . >/dev/null 2>&1 || true
+            git -C "${state_dir}" clean -fdx
           fi
 
-      - name: Upload runtime env
-        shell: bash
-        run: |
-          deploy_path="${VM_DEPLOY_PATH:-/opt/tram}"
-          printf '%s' "${APP_ENV_FILE}" > runtime.env
-          ssh -p "${VM_PORT:-22}" "${VM_USER}@${VM_HOST}" "mkdir -p '${deploy_path}'"
-          scp -P "${VM_PORT:-22}" runtime.env "${VM_USER}@${VM_HOST}:${deploy_path}/.env"
+          mkdir -p "${state_dir}/production"
+          rsync -a --delete deploy/production/ "${state_dir}/production/"
+          {
+            printf 'IMAGE_REF=%s\n' "${image_ref}"
+            printf 'SOURCE_SHA=%s\n' "${SOURCE_SHA}"
+            printf 'UPDATED_AT=%s\n' "${updated_at}"
+          } > "${state_dir}/production/manifest.env"
 
-      - name: Upload compose file
-        shell: bash
-        run: |
-          deploy_path="${VM_DEPLOY_PATH:-/opt/tram}"
-          scp -P "${VM_PORT:-22}" docker-compose.yml "${VM_USER}@${VM_HOST}:${deploy_path}/docker-compose.yml"
+          git -C "${state_dir}" config user.name "github-actions[bot]"
+          git -C "${state_dir}" config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git -C "${state_dir}" add production
 
-      - name: Pull and restart production stack
-        shell: bash
-        run: |
-          deploy_path="${VM_DEPLOY_PATH:-/opt/tram}"
-          ssh -p "${VM_PORT:-22}" "${VM_USER}@${VM_HOST}" "
-            set -eu
-            mkdir -p '${deploy_path}'
-            cd '${deploy_path}'
-            cp .env .compose.env
-            printf '\\nIMAGE_NAME=%s\\nIMAGE_TAG=%s\\n' '${IMAGE_NAME}' '${IMAGE_TAG}' >> .compose.env
-            echo '${GHCR_TOKEN}' | docker login ghcr.io -u '${GHCR_USERNAME}' --password-stdin
-            docker compose --env-file .compose.env pull
-            docker compose --env-file .compose.env up -d --no-build --remove-orphans
-          "
+          if git -C "${state_dir}" diff --cached --quiet; then
+            echo "deploy-state is already up to date"
+            exit 0
+          fi
+
+          git -C "${state_dir}" commit -m "chore: publish production deploy state for ${SOURCE_SHA}"
+          git -C "${state_dir}" push origin "${DEPLOY_BRANCH}"

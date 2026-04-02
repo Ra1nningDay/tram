@@ -1,0 +1,14 @@
+[Unit]
+Description=Pull the latest tram production bundle and apply it
+After=network-online.target docker.service
+Wants=network-online.target
+Requires=docker.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=__DEPLOY_ROOT__/control
+Environment=PULL_ENV_FILE=__DEPLOY_ROOT__/secrets/pull.env
+ExecStart=__DEPLOY_ROOT__/control/production/bin/deploy.sh
+
+[Install]
+WantedBy=multi-user.target
