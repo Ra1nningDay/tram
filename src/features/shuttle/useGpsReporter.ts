@@ -69,12 +69,30 @@ export function useGpsReporter(opts: GpsReporterOptions) {
   const latestPositionRef = useRef<GeolocationPosition | null>(null);
   const watchIdRef = useRef<number | null>(null);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const hasSentInitialFixRef = useRef(false);
+  const isReportingRef = useRef(false);
   const optsRef = useRef(opts);
 
   // Keep opts ref current without re-triggering the effect
   useEffect(() => {
     optsRef.current = opts;
   });
+
+  const sendLatestPosition = useCallback(() => {
+    const pos = latestPositionRef.current;
+    if (!pos || isReportingRef.current) return;
+
+    isReportingRef.current = true;
+    void reportPosition(pos, optsRef.current)
+      .then((result) => {
+        if (!result.ok) {
+          console.warn("[useGpsReporter] report failed:", result.reason);
+        }
+      })
+      .finally(() => {
+        isReportingRef.current = false;
+      });
+  }, []);
 
   const stopWatching = useCallback(() => {
     if (watchIdRef.current !== null) {
@@ -86,6 +104,8 @@ export function useGpsReporter(opts: GpsReporterOptions) {
       intervalRef.current = null;
     }
     latestPositionRef.current = null;
+    hasSentInitialFixRef.current = false;
+    isReportingRef.current = false;
   }, []);
 
   const startWatching = useCallback(() => {
@@ -98,6 +118,11 @@ export function useGpsReporter(opts: GpsReporterOptions) {
     watchIdRef.current = navigator.geolocation.watchPosition(
       (position) => {
         latestPositionRef.current = position;
+
+        if (!hasSentInitialFixRef.current) {
+          hasSentInitialFixRef.current = true;
+          sendLatestPosition();
+        }
       },
       (err) => {
         console.warn("[useGpsReporter] watchPosition error:", err.message);
@@ -111,15 +136,9 @@ export function useGpsReporter(opts: GpsReporterOptions) {
 
     // Send the latest cached position to the server on a fixed interval
     intervalRef.current = setInterval(() => {
-      const pos = latestPositionRef.current;
-      if (!pos) return;
-      void reportPosition(pos, optsRef.current).then((result) => {
-        if (!result.ok) {
-          console.warn("[useGpsReporter] report failed:", result.reason);
-        }
-      });
+      sendLatestPosition();
     }, REPORT_INTERVAL_MS);
-  }, []);
+  }, [sendLatestPosition]);
 
   useEffect(() => {
     if (opts.enabled) {

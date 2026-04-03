@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import type { Vehicle } from "../features/shuttle/api";
 import { parseTramCsvFiltered } from "../lib/csv-parser";
 import { useVehicleStream } from "../features/shuttle/useVehicleStream";
+import { shouldUseLiveVehicleFeed, type VehicleDataMode } from "../features/shuttle/live-mode";
 import {
     TRAM_FILES,
     ROUTE_TOTAL_M,
@@ -126,11 +127,16 @@ function advanceCursorMut(
  */
 export function useLiveOrSimVehicles(
     initialBearing: number = 0,
-    mode: "live" | "simulate" = "simulate",
+    mode: VehicleDataMode = "simulate",
 ): GpsReplayState {
     // ── SSE stream ────────────────────────────────────────────────────
-    const { vehicles: streamVehicles } = useVehicleStream();
-    const hasLiveData = mode === "live";
+    const { vehicles: streamVehicles } = useVehicleStream(mode === "live");
+    const [hasSeenLiveSnapshot, setHasSeenLiveSnapshot] = useState(false);
+    const hasLiveData = shouldUseLiveVehicleFeed(
+        mode,
+        streamVehicles.length,
+        hasSeenLiveSnapshot,
+    );
 
     // ── Shared map updater ref (stable across mode switches) ──────────
     const mapUpdaterRef = useRef<MapSourceUpdater | null>(null);
@@ -162,6 +168,14 @@ export function useLiveOrSimVehicles(
         bearingRef.current = initialBearing;
     }, [initialBearing]);
 
+    useEffect(() => {
+        if (mode !== "live" || streamVehicles.length === 0) {
+            return;
+        }
+
+        setHasSeenLiveSnapshot(true);
+    }, [mode, streamVehicles.length]);
+
     // ── Load CSV for simulation fallback ─────────────────────────────
     useEffect(() => {
         let cancelled = false;
@@ -189,7 +203,6 @@ export function useLiveOrSimVehicles(
         return () => {
             cancelled = true;
         };
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     // ── Snap live GPS positions to route when SSE updates arrive ──────

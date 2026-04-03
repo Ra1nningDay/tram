@@ -16,6 +16,7 @@ import { useLiveOrSimVehicles } from "../hooks/useLiveOrSimVehicles";
 import { useNearestStop } from "../hooks/useNearestStop";
 import { useUserLocation } from "../hooks/useUserLocation";
 import { haversineM } from "../lib/geo/distance";
+import type { VehicleDataMode } from "../features/shuttle/live-mode";
 
 const ALERT_STORAGE_KEY = "map-arrival-alerts-enabled";
 const STOP_PROXIMITY_VIBRATION_DISTANCE_M = 20;
@@ -93,7 +94,7 @@ export function MapPage() {
   const allStops = stopsData?.stops;
   const isMobile = typeof window !== "undefined" ? window.innerWidth < 768 : false;
   const initialBearing = isMobile ? (campusConfig.initialBearing ?? 0) : 0;
-  const [dataMode, setDataMode] = useState<"live" | "simulate">("simulate");
+  const [dataMode, setDataMode] = useState<VehicleDataMode>("live");
   const { vehicles, telemetry, loading, setMapUpdater } = useLiveOrSimVehicles(initialBearing, dataMode);
   const {
     location: userLocation,

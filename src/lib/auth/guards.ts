@@ -3,6 +3,16 @@ import { redirect } from "next/navigation";
 import { userCanAccessAdmin, userCanAccessEditor } from "@/lib/auth/roles";
 import { getAuthSession } from "@/lib/auth/session";
 
+export async function requireAuthenticatedSession(nextPath = "/") {
+  const session = await getAuthSession();
+
+  if (!session) {
+    redirect(`/login?next=${encodeURIComponent(nextPath)}`);
+  }
+
+  return session;
+}
+
 export async function requireEditorAccess(nextPath = "/editor") {
   const session = await getAuthSession();
 
