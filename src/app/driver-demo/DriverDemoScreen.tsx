@@ -258,7 +258,7 @@ function BackgroundTrackingNotice({ emphasized }: BackgroundTrackingNoticeProps)
       <div className="flex items-start gap-2.5">
         <TriangleAlert
           className={cn(
-            "mt-0.5 h-4 w-4 shrink-0 mt-[18px]",
+            "mt-0.5 h-4 w-4 shrink-0",
             emphasized ? "text-[#ffd47b]" : "text-white/55",
           )}
         />
@@ -504,8 +504,8 @@ export function DriverDemoScreen() {
                 )}
               </div>
 
-              <div className="flex flex-1 flex-col px-5 pb-0 pt-6">
-                <div className="mt-8 flex flex-col items-center">
+              <div className="flex flex-1 flex-col px-5 pb-0">
+                <div className="mt-4 flex flex-col items-center">
                   <button
                     type="button"
                     onClick={handlePrimaryAction}
@@ -591,7 +591,7 @@ export function DriverDemoScreen() {
                     <BackgroundTrackingNotice emphasized={hasBackgroundedWhileOnDuty} />
                   )}
 
-                  <div className="grid grid-cols-2 gap-[36px]">
+                  <div className="grid grid-cols-2 gap-[36px] mt-[18px]">
                     <AlertStatusButton
                       icon={Wifi}
                       label={connectivityLabel}
@@ -610,7 +610,7 @@ export function DriverDemoScreen() {
                     />
                   </div>
 
-                  <div className="mt-[18px] flex min-w-0 items-center gap-2.5">
+                  <div className="mt-[18px] flex min-w-0 justify-center items-center gap-2.5">
                     <button
                       type="button"
                       onClick={() => setIsModalOpen(true)}
