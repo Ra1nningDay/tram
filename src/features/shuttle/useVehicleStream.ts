@@ -1,18 +1,16 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { Vehicle } from "@/features/shuttle/api";
+import type { Vehicle, VehicleFeedSnapshot, VehicleTelemetry } from "@/features/shuttle/api";
 
 type StreamState = {
   vehicles: Vehicle[];
+  telemetryByVehicleId: Record<string, VehicleTelemetry>;
   serverTime: string | null;
   connected: boolean;
 };
 
-type SSEPayload = {
-  server_time: string;
-  vehicles: Vehicle[];
-};
+type SSEPayload = VehicleFeedSnapshot;
 
 const RECONNECT_BASE_MS = 1_000;
 const RECONNECT_MAX_MS = 30_000;
@@ -29,6 +27,7 @@ const STREAM_PATH = "/api/vehicles/stream";
 export function useVehicleStream(enabled = true): StreamState {
   const [state, setState] = useState<StreamState>({
     vehicles: [],
+    telemetryByVehicleId: {},
     serverTime: null,
     connected: false,
   });
@@ -57,6 +56,7 @@ export function useVehicleStream(enabled = true): StreamState {
         const payload = JSON.parse(event.data) as SSEPayload;
         setState({
           vehicles: payload.vehicles,
+          telemetryByVehicleId: payload.telemetryByVehicleId ?? {},
           serverTime: payload.server_time,
           connected: true,
         });

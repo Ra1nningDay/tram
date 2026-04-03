@@ -1,14 +1,26 @@
 import type { Vehicle } from "@/features/shuttle/api";
+import {
+  buildLiveVehicleTelemetryState,
+  getTelemetryRouteContext,
+  type LiveVehicleTelemetryState,
+  type RawVehicleFix,
+} from "@/lib/vehicles/telemetry";
 import { deriveVehicleStatus } from "@/lib/vehicles/status";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
 export type VehicleSource = "hardware" | "driver";
 
-export type IngestedVehicle = Vehicle & {
-  speed?: number;
+export type IngestedVehicle = {
+  id: string;
+  label?: string;
+  direction: Vehicle["direction"];
   source: VehicleSource;
+  crowding?: Vehicle["crowding"];
   sessionId?: string;
+  rawFix: RawVehicleFix;
+  previousRawFix?: RawVehicleFix;
+  telemetry: LiveVehicleTelemetryState;
   receivedAt: Date;
 };
 
@@ -34,7 +46,7 @@ function getStore(): Map<string, IngestedVehicle> {
  * Upsert the latest position for a vehicle.
  * Returns the updated vehicle record.
  */
-export function upsertVehicle(data: {
+export async function upsertVehicle(data: {
   id: string;
   label?: string;
   latitude: number;
@@ -45,23 +57,42 @@ export function upsertVehicle(data: {
   source: VehicleSource;
   crowding?: Vehicle["crowding"];
   sessionId?: string;
-}): IngestedVehicle {
+}): Promise<IngestedVehicle> {
   const store = getStore();
   const now = new Date();
-
-  const vehicle: IngestedVehicle = {
-    id: data.id,
-    label: data.label,
+  const existing = store.get(data.id);
+  const rawFix: RawVehicleFix = {
     latitude: data.latitude,
     longitude: data.longitude,
     heading: data.heading,
     speed: data.speed,
+    receivedAt: now,
+  };
+
+  const telemetry = buildLiveVehicleTelemetryState(
+    {
+      id: data.id,
+      label: data.label,
+      direction: data.direction,
+      crowding: data.crowding,
+      lastUpdated: now.toISOString(),
+      rawFix,
+      previousRawFix: existing?.rawFix,
+      previousTelemetry: existing?.telemetry,
+    },
+    await getTelemetryRouteContext(),
+  );
+
+  const vehicle: IngestedVehicle = {
+    id: data.id,
+    label: data.label,
     direction: data.direction,
     source: data.source,
-    sessionId: data.sessionId,
-    last_updated: now.toISOString(),
-    status: "fresh",
     crowding: data.crowding,
+    sessionId: data.sessionId,
+    rawFix,
+    previousRawFix: existing?.rawFix,
+    telemetry,
     receivedAt: now,
   };
 
@@ -98,7 +129,7 @@ export function getAllVehicles(): Vehicle[] {
   const vehicles: Vehicle[] = [];
 
   for (const v of store.values()) {
-    const status = deriveVehicleStatus(v.last_updated, nowMs);
+    const status = deriveVehicleStatus(v.telemetry.snapshot.last_updated, nowMs);
 
     if (status === "hidden") {
       hiddenVehicleIds.push(v.id);
@@ -106,16 +137,9 @@ export function getAllVehicles(): Vehicle[] {
     }
 
     vehicles.push({
-      id: v.id,
-      label: v.label,
-      latitude: v.latitude,
-      longitude: v.longitude,
-      heading: v.heading,
-      direction: v.direction,
-      last_updated: v.last_updated,
+      ...v.telemetry.snapshot,
       status,
-      crowding: v.crowding,
-    } satisfies Vehicle);
+    });
   }
 
   for (const vehicleId of hiddenVehicleIds) {
@@ -128,4 +152,34 @@ export function getAllVehicles(): Vehicle[] {
 /** True when at least one vehicle has been ingested (not mock). */
 export function hasLiveVehicles(): boolean {
   return getStore().size > 0;
+}
+
+export function getAllVehicleTelemetryStates(): LiveVehicleTelemetryState[] {
+  const store = getStore();
+  const nowMs = Date.now();
+  const hiddenVehicleIds: string[] = [];
+  const telemetryStates: LiveVehicleTelemetryState[] = [];
+
+  for (const vehicle of store.values()) {
+    const status = deriveVehicleStatus(vehicle.telemetry.snapshot.last_updated, nowMs);
+
+    if (status === "hidden") {
+      hiddenVehicleIds.push(vehicle.id);
+      continue;
+    }
+
+    telemetryStates.push({
+      ...vehicle.telemetry,
+      snapshot: {
+        ...vehicle.telemetry.snapshot,
+        status,
+      },
+    });
+  }
+
+  for (const vehicleId of hiddenVehicleIds) {
+    store.delete(vehicleId);
+  }
+
+  return telemetryStates;
 }

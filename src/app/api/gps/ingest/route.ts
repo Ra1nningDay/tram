@@ -4,8 +4,8 @@ import { headers } from "next/headers";
 import { getAuth } from "@/lib/auth";
 import { getPrisma } from "@/lib/prisma";
 import { publishVehicleUpdate } from "@/lib/redis";
+import { buildLiveVehicleFeedSnapshot } from "@/lib/vehicles/live";
 import { upsertVehicle } from "@/lib/vehicles/store";
-import { getAllVehicles } from "@/lib/vehicles/store";
 import { removeVehicle } from "@/lib/vehicles/store";
 import type { VehicleSource } from "@/lib/vehicles/store";
 
@@ -133,7 +133,7 @@ export async function POST(req: NextRequest) {
   }
 
   // 3. Upsert in-memory store
-  upsertVehicle({
+  await upsertVehicle({
     id: body.vehicle_id,
     label: body.label,
     latitude: body.latitude,
@@ -167,7 +167,7 @@ export async function POST(req: NextRequest) {
 
   // 5. Broadcast via Redis Pub/Sub → triggers SSE push to all clients
   try {
-    await publishVehicleUpdate(getAllVehicles());
+    await publishVehicleUpdate(await buildLiveVehicleFeedSnapshot());
   } catch (err) {
     console.error("[gps/ingest] redis publish failed:", err);
   }
@@ -202,7 +202,7 @@ export async function DELETE(req: NextRequest) {
   const removed = removeVehicle(body.vehicle_id, body.session_id);
 
   try {
-    await publishVehicleUpdate(getAllVehicles());
+    await publishVehicleUpdate(await buildLiveVehicleFeedSnapshot());
   } catch (err) {
     console.error("[gps/ingest] redis publish failed:", err);
   }

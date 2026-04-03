@@ -1,13 +1,66 @@
-import type { Status, Vehicle } from "@/features/shuttle/api";
+import type { Status, Vehicle, VehicleFeedSnapshot } from "@/features/shuttle/api";
 import { readVehicleSnapshot } from "@/lib/redis";
+import { buildVehicleEtaSnapshot } from "@/lib/vehicles/eta";
 import { normalizeLiveVehicleFeed } from "@/lib/vehicles/status";
-import { getAllVehicles } from "@/lib/vehicles/store";
+import {
+  getAllVehicleTelemetryStates,
+  getAllVehicles,
+} from "@/lib/vehicles/store";
+
+function buildFilteredTelemetryByVehicleId(
+  vehicles: Vehicle[],
+  telemetryByVehicleId: VehicleFeedSnapshot["telemetryByVehicleId"],
+) {
+  const activeVehicleIds = new Set(vehicles.map((vehicle) => vehicle.id));
+  const filtered: VehicleFeedSnapshot["telemetryByVehicleId"] = {};
+
+  for (const [vehicleId, telemetry] of Object.entries(telemetryByVehicleId)) {
+    if (activeVehicleIds.has(vehicleId)) {
+      filtered[vehicleId] = telemetry;
+    }
+  }
+
+  return filtered;
+}
+
+export async function buildLiveVehicleFeedSnapshot(
+  serverTime: Date = new Date(),
+): Promise<VehicleFeedSnapshot> {
+  const telemetryStates = getAllVehicleTelemetryStates();
+  const vehicles = telemetryStates.map((telemetry) => telemetry.snapshot);
+  const { telemetryByVehicleId } = await buildVehicleEtaSnapshot(telemetryStates, serverTime);
+
+  return {
+    server_time: serverTime.toISOString(),
+    vehicles,
+    telemetryByVehicleId,
+  };
+}
 
 // ── Live Feed ────────────────────────────────────────────────────────────────
 
-export async function getLiveVehicleFeed(): Promise<Vehicle[]> {
+export async function getLiveVehicleFeedSnapshot(): Promise<VehicleFeedSnapshot> {
   const snapshot = await readVehicleSnapshot();
-  return snapshot ?? normalizeLiveVehicleFeed(getAllVehicles());
+  if (snapshot) {
+    return {
+      ...snapshot,
+      telemetryByVehicleId: buildFilteredTelemetryByVehicleId(
+        snapshot.vehicles,
+        snapshot.telemetryByVehicleId,
+      ),
+    };
+  }
+
+  return buildLiveVehicleFeedSnapshot();
+}
+
+export async function getLiveVehicleFeed(): Promise<Vehicle[]> {
+  const snapshot = await getLiveVehicleFeedSnapshot();
+  return snapshot.vehicles;
+}
+
+export function getCurrentLiveVehicleFeed(): Vehicle[] {
+  return normalizeLiveVehicleFeed(getAllVehicles());
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────

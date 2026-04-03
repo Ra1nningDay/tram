@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import type { Vehicle } from "../features/shuttle/api";
+import type { Vehicle, VehicleTelemetry } from "../features/shuttle/api";
 import { type GpsPoint, parseTramCsvFiltered } from "../lib/csv-parser";
 import { haversineM } from "../lib/geo/distance";
 import shuttleData from "../data/shuttle-data.json";
@@ -118,18 +118,6 @@ export function positionAtDistance(distM: number): { lng: number; lat: number; h
 /* ------------------------------------------------------------------ */
 /*  Telemetry                                                          */
 /* ------------------------------------------------------------------ */
-
-export interface VehicleTelemetry {
-    vehicleId: string;
-    label: string;
-    speedKmh: number;
-    nextStopName: string;
-    distanceToNextStopM: number;
-    progressPercent: number;
-    prevStopName: string;
-    status: "normal" | "warning";
-    crowding?: Vehicle["crowding"];
-}
 
 export function computeTelemetry(
     vehicleId: string,
