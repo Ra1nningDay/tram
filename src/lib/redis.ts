@@ -3,6 +3,8 @@ import type { Vehicle } from "@/features/shuttle/api";
 
 // ── Channels ────────────────────────────────────────────────────────────────
 export const CHANNEL_VEHICLES = "vehicles:update";
+const VEHICLE_SNAPSHOT_KEY = "vehicles:snapshot";
+const REDIS_READY_TIMEOUT_MS = 1_500;
 
 // ── Connection options ───────────────────────────────────────────────────────
 const REDIS_URL = process.env.REDIS_URL ?? "redis://localhost:6379";
@@ -72,19 +74,94 @@ export type VehicleUpdatePayload = {
   vehicles: Vehicle[];
 };
 
+function isRedisReady(client: Redis): boolean {
+  return client.status === "ready";
+}
+
+async function ensureRedisReady(client: Redis): Promise<boolean> {
+  if (isRedisReady(client)) {
+    return true;
+  }
+
+  if (client.status === "wait" || client.status === "end" || client.status === "close") {
+    try {
+      await client.connect();
+    } catch {
+      // Fall through and inspect final status below.
+    }
+  }
+
+  if (isRedisReady(client)) {
+    return true;
+  }
+
+  return await new Promise<boolean>((resolve) => {
+    const timeout = setTimeout(() => {
+      cleanup();
+      resolve(isRedisReady(client));
+    }, REDIS_READY_TIMEOUT_MS);
+
+    const cleanup = () => {
+      clearTimeout(timeout);
+      client.off("ready", onReady);
+      client.off("error", onError);
+      client.off("end", onEnd);
+    };
+
+    const onReady = () => {
+      cleanup();
+      resolve(true);
+    };
+
+    const onError = () => {
+      cleanup();
+      resolve(false);
+    };
+
+    const onEnd = () => {
+      cleanup();
+      resolve(false);
+    };
+
+    client.on("ready", onReady);
+    client.on("error", onError);
+    client.on("end", onEnd);
+  });
+}
+
+export async function readVehicleSnapshot(): Promise<Vehicle[] | null> {
+  const isReady = await ensureRedisReady(redisPublisher);
+  if (!isReady) {
+    return null;
+  }
+
+  try {
+    const raw = await redisPublisher.get(VEHICLE_SNAPSHOT_KEY);
+    if (!raw) {
+      return null;
+    }
+
+    const parsed = JSON.parse(raw) as Vehicle[];
+    return Array.isArray(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
 /**
- * Publish a vehicle snapshot to all SSE subscribers.
- * Silently no-ops when Redis is not connected.
+ * Publish and persist a vehicle snapshot for all live clients.
  */
 export async function publishVehicleUpdate(
   vehicles: Vehicle[],
 ): Promise<void> {
-  if (redisPublisher.status !== "ready") return;
+  const isReady = await ensureRedisReady(redisPublisher);
+  if (!isReady) return;
 
   const payload: VehicleUpdatePayload = {
     server_time: new Date().toISOString(),
     vehicles,
   };
 
+  await redisPublisher.set(VEHICLE_SNAPSHOT_KEY, JSON.stringify(vehicles));
   await redisPublisher.publish(CHANNEL_VEHICLES, JSON.stringify(payload));
 }

@@ -56,11 +56,15 @@ function formatEtaMinutes(eta?: Eta): string {
   return `~${eta.eta_minutes} นาที`;
 }
 
-function getDensity(status: string): {
+function getDensity(status: string, crowding?: Vehicle["crowding"]): {
   label: string;
   level: number;
   color: string;
 } {
+  if (crowding === "full") {
+    return { label: "คนเต็ม", level: 3, color: "#EF4444" };
+  }
+
   if (status === "warning") {
     return { label: "หนาแน่น", level: 3, color: "#EF4444" };
   }
@@ -96,7 +100,6 @@ type PanelTheme = {
 
 const MOBILE_HEADER_HEIGHT = 126;
 const DESKTOP_HEADER_HEIGHT = 110;
-const DESKTOP_LG_HEADER_HEIGHT = 122;
 
 function getPanelTheme(date = new Date()): PanelTheme {
   const hour = date.getHours();
@@ -416,7 +419,7 @@ function BusCard({
     isUsingRecommendedStop && stopEta
       ? formatEtaMinutes(stopEta)
       : formatDistanceEta(distanceToStopM, tele.speedKmh);
-  const density = getDensity(tele.status);
+  const density = getDensity(tele.status, tele.crowding);
   const routeLabel = `${tele.prevStopName} >> ${toStopName}`;
   const alertLabel = "แจ้งเตือน";
   const AlertIcon = isAlertEnabled ? BellRing : Bell;

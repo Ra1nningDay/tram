@@ -6,7 +6,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-    const vehicles = getLiveVehicleFeed();
+    const vehicles = await getLiveVehicleFeed();
     return NextResponse.json({
         server_time: new Date().toISOString(),
         vehicles,

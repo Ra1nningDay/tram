@@ -291,6 +291,7 @@ export function DriverDemoScreen() {
     vehicleId: selectedVehicle,
     vehicleLabel: selectedVehicle,
     direction: ROUTE_DIRECTION_MAP[ROUTE_OPTIONS[routeIndex]] ?? "outbound",
+    crowding: mode === "full" ? "full" : "normal",
   });
 
   useEffect(() => {

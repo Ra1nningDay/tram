@@ -53,6 +53,7 @@ type IngestBody = {
   heading?: number;
   speed?: number;
   direction?: "outbound" | "inbound";
+  crowding?: "normal" | "full";
 };
 
 function validateBody(body: unknown): IngestBody | null {
@@ -76,6 +77,7 @@ function validateBody(body: unknown): IngestBody | null {
     speed: typeof b.speed === "number" ? b.speed : undefined,
     direction:
       b.direction === "inbound" ? "inbound" : "outbound",
+    crowding: b.crowding === "full" ? "full" : "normal",
   };
 }
 
@@ -134,6 +136,7 @@ export async function POST(req: NextRequest) {
     speed: body.speed,
     direction: body.direction ?? "outbound",
     source,
+    crowding: body.crowding,
   });
 
   // 4. Persist GPS history to PostgreSQL (fire-and-forget)

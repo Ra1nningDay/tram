@@ -128,10 +128,15 @@ export interface VehicleTelemetry {
     progressPercent: number;
     prevStopName: string;
     status: "normal" | "warning";
+    crowding?: Vehicle["crowding"];
 }
 
 export function computeTelemetry(
-    vehicleId: string, label: string, distanceM: number, speedKmh: number,
+    vehicleId: string,
+    label: string,
+    distanceM: number,
+    speedKmh: number,
+    crowding?: Vehicle["crowding"],
 ): VehicleTelemetry {
     const d = ((distanceM % ROUTE_TOTAL_M) + ROUTE_TOTAL_M) % ROUTE_TOTAL_M;
     let nextIdx = STOPS_ON_ROUTE.findIndex((s) => s.distanceM > d);
@@ -157,6 +162,7 @@ export function computeTelemetry(
         progressPercent: Math.round(progressPercent),
         prevStopName: prevStop.name,
         status: speedKmh < 1 ? "warning" : "normal",
+        crowding,
     };
 }
 

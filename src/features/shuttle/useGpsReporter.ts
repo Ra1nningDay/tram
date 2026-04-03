@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef } from "react";
+import type { Vehicle } from "./api";
 
 // GPS position reported to the server every REPORT_INTERVAL_MS while on duty
 const REPORT_INTERVAL_MS = 5_000;
@@ -11,6 +12,7 @@ type GpsReporterOptions = {
   vehicleId: string;
   vehicleLabel?: string;
   direction?: "outbound" | "inbound";
+  crowding?: Vehicle["crowding"];
 };
 
 type ReportResult =
@@ -53,6 +55,7 @@ async function reportPosition(
         heading: position.coords.heading ?? undefined,
         speed: position.coords.speed ?? undefined,
         direction: direction ?? "outbound",
+        crowding: opts.crowding ?? "normal",
       }),
       credentials: "include", // send session cookie
     });
@@ -89,6 +92,7 @@ export function useGpsReporter(opts: GpsReporterOptions) {
   const hasSentInitialFixRef = useRef(false);
   const isReportingRef = useRef(false);
   const activeVehicleIdRef = useRef<string | null>(null);
+  const activeCrowdingRef = useRef<Vehicle["crowding"]>("normal");
   const optsRef = useRef(opts);
 
   // Keep opts ref current without re-triggering the effect
@@ -164,10 +168,12 @@ export function useGpsReporter(opts: GpsReporterOptions) {
 
   useEffect(() => {
     const previousVehicleId = activeVehicleIdRef.current;
+    const previousCrowding = activeCrowdingRef.current;
 
     if (!opts.enabled) {
       stopWatching();
       activeVehicleIdRef.current = null;
+      activeCrowdingRef.current = "normal";
       if (previousVehicleId) {
         void stopReporting(previousVehicleId);
       }
@@ -175,6 +181,7 @@ export function useGpsReporter(opts: GpsReporterOptions) {
     }
 
     activeVehicleIdRef.current = opts.vehicleId;
+    activeCrowdingRef.current = opts.crowding ?? "normal";
     startWatching();
 
     if (previousVehicleId && previousVehicleId !== opts.vehicleId) {
@@ -182,11 +189,23 @@ export function useGpsReporter(opts: GpsReporterOptions) {
       hasSentInitialFixRef.current = false;
     }
 
-    if (!hasSentInitialFixRef.current && latestPositionRef.current) {
+    const crowdingChanged = previousCrowding !== (opts.crowding ?? "normal");
+
+    if (
+      latestPositionRef.current &&
+      (!hasSentInitialFixRef.current || crowdingChanged)
+    ) {
       hasSentInitialFixRef.current = true;
       sendLatestPosition();
     }
-  }, [opts.enabled, opts.vehicleId, sendLatestPosition, startWatching, stopWatching]);
+  }, [
+    opts.enabled,
+    opts.vehicleId,
+    opts.crowding,
+    sendLatestPosition,
+    startWatching,
+    stopWatching,
+  ]);
 
   useEffect(() => {
     return () => {
@@ -194,6 +213,7 @@ export function useGpsReporter(opts: GpsReporterOptions) {
 
       stopWatching();
       activeVehicleIdRef.current = null;
+      activeCrowdingRef.current = "normal";
 
       if (activeVehicleId) {
         void stopReporting(activeVehicleId);

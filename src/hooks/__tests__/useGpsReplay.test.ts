@@ -50,11 +50,12 @@ describe("GPS Replay / Route Calculations", () => {
         const distanceM = 100;
         const speedKmh = 15;
 
-        const telemetry = computeTelemetry(vehicleId, label, distanceM, speedKmh);
+        const telemetry = computeTelemetry(vehicleId, label, distanceM, speedKmh, "full");
 
         expect(telemetry.vehicleId).toBe(vehicleId);
         expect(telemetry.label).toBe(label);
         expect(telemetry.speedKmh).toBe(15);
+        expect(telemetry.crowding).toBe("full");
         
         // Ensure status handles low speed correctly
         expect(telemetry.status).toBe("normal");

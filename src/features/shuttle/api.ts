@@ -1,6 +1,7 @@
 import { resolveApiUrl } from "../../lib/config";
 
 export type Status = "fresh" | "delayed" | "offline" | "hidden";
+export type VehicleCrowding = "normal" | "full";
 
 export type Vehicle = {
   id: string;
@@ -11,6 +12,7 @@ export type Vehicle = {
   direction: "outbound" | "inbound";
   last_updated: string;
   status: Status;
+  crowding?: VehicleCrowding;
 };
 
 export type Stop = {

@@ -34,7 +34,7 @@ export async function getAdminOverviewData(): Promise<AdminOverviewData> {
     getShuttleData(),
     getMapConfig(),
   ]);
-  const liveVehicles = getLiveVehicleFeed();
+  const liveVehicles = await getLiveVehicleFeed();
 
   // Snapshot files summary (now DB-backed, show as virtual entries)
   const snapshotFiles: SnapshotFileSummary[] = [

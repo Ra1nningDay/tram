@@ -43,6 +43,7 @@ export function upsertVehicle(data: {
   speed?: number;
   direction: "outbound" | "inbound";
   source: VehicleSource;
+  crowding?: Vehicle["crowding"];
 }): IngestedVehicle {
   const store = getStore();
   const now = new Date();
@@ -58,6 +59,7 @@ export function upsertVehicle(data: {
     source: data.source,
     last_updated: now.toISOString(),
     status: "fresh",
+    crowding: data.crowding,
     receivedAt: now,
   };
 
@@ -98,6 +100,7 @@ export function getAllVehicles(): Vehicle[] {
       direction: v.direction,
       last_updated: v.last_updated,
       status,
+      crowding: v.crowding,
     } satisfies Vehicle;
   });
 }

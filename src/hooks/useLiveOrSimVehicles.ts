@@ -44,6 +44,7 @@ type LiveCursor = {
     /** Derived speed in km/h from consecutive GPS snapshots */
     speedKmh: number;
     heading: number;
+    crowding?: Vehicle["crowding"];
     direction: Vehicle["direction"];
     status: Vehicle["status"];
     last_updated: string;
@@ -266,6 +267,7 @@ export function useLiveOrSimVehicles(
                 routeDistanceM: newRouteDistanceM,
                 speedKmh,
                 heading,
+                crowding: v.crowding,
                 direction: v.direction,
                 status: v.status,
                 last_updated: v.last_updated,
@@ -312,6 +314,7 @@ export function useLiveOrSimVehicles(
                         cursor.label,
                         cursor.routeDistanceM,
                         cursor.speedKmh,
+                        cursor.crowding,
                     ),
                 );
                 newVehicles.push({
@@ -323,6 +326,7 @@ export function useLiveOrSimVehicles(
                     direction: cursor.direction,
                     last_updated: cursor.last_updated,
                     status: cursor.status,
+                    crowding: cursor.crowding,
                 });
             }
         } else {

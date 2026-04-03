@@ -35,7 +35,7 @@ export async function GET() {
       }
 
       // ── 1. Send current snapshot immediately on connect ───────────────
-      const initial = getLiveVehicleFeed();
+      const initial = await getLiveVehicleFeed();
       sendEvent({ server_time: new Date().toISOString(), vehicles: initial });
 
       // ── 2. Subscribe to Redis channel ─────────────────────────────────
