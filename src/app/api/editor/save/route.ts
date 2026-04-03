@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getShuttleData } from "@/lib/data/shuttle-data";
+import { getMapConfig, getShuttleData } from "@/lib/data/shuttle-data";
 import { saveEditorData } from "@/lib/data/shuttle-data";
 import { getAuth } from "@/lib/auth";
 import { userCanAccessEditor } from "@/lib/auth/roles";
@@ -12,6 +12,12 @@ type SavePayload = {
   routeCoordinates?: unknown;
   polygon?: unknown;
   stops?: unknown;
+};
+
+type EditorBootstrapPayload = {
+  routeCoordinates: LngLat[];
+  polygon: LngLat[];
+  stops: ParsedStop[];
 };
 
 function isFiniteNumber(value: unknown): value is number {
@@ -82,9 +88,53 @@ function parseStops(value: unknown): ParsedStop[] | null {
   });
 }
 
-export async function GET() {
-  const data = await getShuttleData();
-  return NextResponse.json({ ok: true, data });
+export async function GET(request: Request) {
+  try {
+    const session = await getAuth().api.getSession({
+      headers: request.headers,
+      query: { disableRefresh: true },
+    });
+
+    if (!session) {
+      return NextResponse.json({ ok: false, error: "Authentication required" }, { status: 401 });
+    }
+
+    const canAccessEditor = await userCanAccessEditor(session.user.id);
+    if (!canAccessEditor) {
+      return NextResponse.json({ ok: false, error: "Editor role required" }, { status: 403 });
+    }
+
+    const [data, mapConfig] = await Promise.all([getShuttleData(), getMapConfig()]);
+    const routeCoordinates = data.routes[0]?.directions[0]?.coordinates ?? [];
+    const stops: ParsedStop[] = data.stops.map((stop, index) => ({
+      id: stop.id,
+      name_th: stop.nameTh,
+      name_en: stop.nameEn ?? undefined,
+      latitude: stop.latitude,
+      longitude: stop.longitude,
+      sequence: stop.sequence || index + 1,
+      direction: stop.direction,
+      icon: stop.icon ?? undefined,
+      color: stop.color ?? undefined,
+    }));
+
+    const payload: EditorBootstrapPayload = {
+      routeCoordinates,
+      polygon: mapConfig.polygon,
+      stops,
+    };
+
+    return NextResponse.json({ ok: true, data: payload });
+  } catch (error) {
+    console.error("Failed to load editor data", error);
+    return NextResponse.json(
+      {
+        ok: false,
+        error: error instanceof Error ? error.message : "Unknown load error",
+      },
+      { status: 500 }
+    );
+  }
 }
 
 export async function POST(request: Request) {

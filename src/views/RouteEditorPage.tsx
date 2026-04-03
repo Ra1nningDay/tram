@@ -2,12 +2,10 @@ import { useState, useCallback, useEffect, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useTheme } from "next-themes";
 import { DrawingEditorControls, useDrawingEditor } from "../components/DrawingEditor";
+import { StopEditorControls, type StopMarker, useStopEditor } from "../components/StopEditor";
 import { DrawingEditorMap } from "../features/map/DrawingEditorMap";
-import { StopEditorControls, useStopEditor } from "../components/StopEditor";
 import { StopEditorMap } from "../features/map/StopEditorMap";
 import { Route, MapPin, Pentagon, Check, PanelBottomClose, PanelBottomOpen } from "lucide-react";
-import shuttleData from "../data/shuttle-data.json";
-import campusConfig from "../data/campus-config.json";
 
 type EditorTab = "route" | "stops" | "mask";
 
@@ -23,6 +21,16 @@ type StopPayload = {
   color?: string;
 };
 
+type EditorBootstrapResponse = {
+  ok?: boolean;
+  data?: {
+    routeCoordinates?: unknown;
+    polygon?: unknown;
+    stops?: unknown;
+  };
+  error?: string;
+};
+
 type PersistErrorCode = "UNAUTHORIZED" | "FORBIDDEN";
 
 type PersistError = Error & {
@@ -33,6 +41,64 @@ function createPersistError(message: string, code?: PersistErrorCode): PersistEr
   const error = new Error(message) as PersistError;
   error.code = code;
   return error;
+}
+
+function isFiniteNumber(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value);
+}
+
+function isLngLat(value: unknown): value is [number, number] {
+  return (
+    Array.isArray(value) &&
+    value.length === 2 &&
+    isFiniteNumber(value[0]) &&
+    isFiniteNumber(value[1])
+  );
+}
+
+function normalizeLngLatList(value: unknown): [number, number][] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value.filter(isLngLat);
+}
+
+function normalizeEditorStops(value: unknown): StopMarker[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .flatMap((item, index) => {
+      if (!item || typeof item !== "object") {
+        return [];
+      }
+
+      const stop = item as Partial<StopPayload>;
+
+      if (!isFiniteNumber(stop.longitude) || !isFiniteNumber(stop.latitude)) {
+        return [];
+      }
+
+      const sequence = isFiniteNumber(stop.sequence) ? stop.sequence : index + 1;
+
+      return [
+        {
+          sequence,
+          marker: {
+            id: typeof stop.id === "string" && stop.id.trim() ? stop.id : `stop-${index + 1}`,
+            position: [stop.longitude, stop.latitude] as [number, number],
+            name_th: typeof stop.name_th === "string" ? stop.name_th : "",
+            name_en: typeof stop.name_en === "string" ? stop.name_en : "",
+            icon: typeof stop.icon === "string" ? stop.icon : undefined,
+            color: typeof stop.color === "string" ? stop.color : undefined,
+          },
+        },
+      ];
+    })
+    .sort((left, right) => left.sequence - right.sequence)
+    .map((entry) => entry.marker);
 }
 
 function normalizeStopPayload(stops: Array<{
@@ -68,11 +134,11 @@ export function RouteEditorPage() {
   const drawingEditor = useDrawingEditor();
   const stopEditor = useStopEditor();
 
-  const routePointsRef = useRef<[number, number][]>(
-    shuttleData.routes[0].directions[0].geometry.coordinates as [number, number][]
-  );
-  const maskPointsRef = useRef<[number, number][]>(campusConfig.polygon as [number, number][]);
+  const routePointsRef = useRef<[number, number][]>([]);
+  const maskPointsRef = useRef<[number, number][]>([]);
   const hasLoadedRef = useRef(false);
+  const skipNextAutoSaveRef = useRef(true);
+  const [isBootstrapping, setIsBootstrapping] = useState(true);
 
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState("Saved");
@@ -114,11 +180,28 @@ export function RouteEditorPage() {
         setTheme(originalThemeRef.current);
       }
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const applyDrawingDataForTab = useCallback(
+    (tab: EditorTab) => {
+      if (tab === "mask") {
+        drawingEditor.changeMode("polygon");
+        drawingEditor.loadData(maskPointsRef.current);
+        return;
+      }
+
+      drawingEditor.changeMode("route");
+      drawingEditor.loadData(routePointsRef.current);
+    },
+    [drawingEditor.changeMode, drawingEditor.loadData]
+  );
 
   const handleTabChange = useCallback(
     (newTab: EditorTab) => {
+      if (!hasLoadedRef.current) {
+        return;
+      }
+
       if (activeTab === "route") {
         routePointsRef.current = drawingEditor.points;
       } else if (activeTab === "mask") {
@@ -127,33 +210,16 @@ export function RouteEditorPage() {
 
       setActiveTab(newTab);
 
-      if (newTab === "route") {
-        drawingEditor.changeMode("route");
-        drawingEditor.loadData(routePointsRef.current);
-      } else if (newTab === "mask") {
-        drawingEditor.changeMode("polygon");
-        drawingEditor.loadData(maskPointsRef.current);
+      if (newTab !== "stops") {
+        applyDrawingDataForTab(newTab);
       }
 
       if (newTab !== activeTab) {
         router.replace(`/editor?tab=${newTab}`);
       }
     },
-    [activeTab, drawingEditor, router]
+    [activeTab, applyDrawingDataForTab, drawingEditor.points, router]
   );
-
-  useEffect(() => {
-    if (!hasLoadedRef.current) {
-      if (initialTab === "mask") {
-        drawingEditor.changeMode("polygon");
-        drawingEditor.loadData(maskPointsRef.current);
-      } else {
-        drawingEditor.changeMode("route");
-        drawingEditor.loadData(routePointsRef.current);
-      }
-      hasLoadedRef.current = true;
-    }
-  }, [drawingEditor, initialTab]);
 
   const handlePersistFailure = useCallback(
     (error: unknown, fallbackMessage: string) => {
@@ -177,6 +243,59 @@ export function RouteEditorPage() {
     },
     [router, showToastMessage]
   );
+
+  useEffect(() => {
+    if (hasLoadedRef.current) {
+      return;
+    }
+
+    let cancelled = false;
+
+    const loadInitialEditorData = async () => {
+      try {
+        const res = await fetch("/api/editor/save", { cache: "no-store" });
+        const body = (await res.json().catch(() => ({}))) as EditorBootstrapResponse;
+
+        if (!res.ok) {
+          if (res.status === 401) {
+            throw createPersistError("Authentication required", "UNAUTHORIZED");
+          }
+
+          if (res.status === 403) {
+            throw createPersistError("Editor role required", "FORBIDDEN");
+          }
+
+          throw createPersistError(body.error ?? "Failed to load editor data");
+        }
+
+        if (cancelled) {
+          return;
+        }
+
+        routePointsRef.current = normalizeLngLatList(body.data?.routeCoordinates);
+        maskPointsRef.current = normalizeLngLatList(body.data?.polygon);
+        skipNextAutoSaveRef.current = true;
+        stopEditor.loadStops(normalizeEditorStops(body.data?.stops));
+
+        applyDrawingDataForTab(activeTab);
+        hasLoadedRef.current = true;
+      } catch (error) {
+        if (!cancelled) {
+          handlePersistFailure(error, "Failed to load editor data");
+        }
+      } finally {
+        if (!cancelled) {
+          setIsBootstrapping(false);
+        }
+      }
+    };
+
+    void loadInitialEditorData();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeTab, applyDrawingDataForTab, handlePersistFailure, stopEditor.loadStops]);
 
   const persistEditorData = useCallback(async () => {
     const routeCoordinates = activeTab === "route" ? drawingEditor.points : routePointsRef.current;
@@ -220,7 +339,7 @@ export function RouteEditorPage() {
 
         void persistEditorData()
           .then(() => {
-            showToastMessage("Saved to JSON files");
+            showToastMessage("Saved to server");
           })
           .catch((error: unknown) => {
             handlePersistFailure(error, "Save failed");
@@ -231,6 +350,22 @@ export function RouteEditorPage() {
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [handlePersistFailure, persistEditorData, showToastMessage]);
+
+  useEffect(() => {
+    if (!hasLoadedRef.current) return;
+    if (skipNextAutoSaveRef.current) {
+      skipNextAutoSaveRef.current = false;
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      void persistEditorData().catch((error: unknown) => {
+        console.error("Auto-save failed:", error);
+      });
+    }, 1500);
+
+    return () => clearTimeout(timer);
+  }, [drawingEditor.points, stopEditor.stops, persistEditorData]);
 
   const handleDrawingExport = useCallback(() => {
     drawingEditor.exportData();
@@ -256,6 +391,15 @@ export function RouteEditorPage() {
 
   return (
     <div className="relative h-screen w-screen overflow-hidden">
+      {isBootstrapping && (
+        <div className="absolute inset-0 z-[60] flex items-center justify-center bg-[rgba(15,23,42,0.18)] backdrop-blur-sm">
+          <div className="glass-card-dark flex items-center gap-3 rounded-xl px-4 py-3 shadow-lg">
+            <div className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+            <span className="text-sm font-medium">Loading saved editor data...</span>
+          </div>
+        </div>
+      )}
+
       <div
         className={`fixed left-1/2 top-6 z-50 -translate-x-1/2 transform transition-all duration-300 pointer-events-none ${
           showToast ? "translate-y-0 opacity-100" : "-translate-y-4 opacity-0"

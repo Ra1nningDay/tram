@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { Eta, Stop, Vehicle } from "../features/shuttle/api";
 import { formatDistance, formatWalkingTime } from "../lib/format-distance";
 import { STOPS_ON_ROUTE, type VehicleTelemetry } from "../hooks/useGpsReplay";
+import { getCrowdingDisplay } from "../lib/vehicles/crowding";
 
 interface VehiclePanelProps {
   vehicles: Vehicle[];
@@ -54,22 +55,6 @@ function formatEtaMinutes(eta?: Eta): string {
 
   if (eta.eta_minutes < 1) return "< 1 นาที";
   return `~${eta.eta_minutes} นาที`;
-}
-
-function getDensity(status: string, crowding?: Vehicle["crowding"]): {
-  label: string;
-  level: number;
-  color: string;
-} {
-  if (crowding === "full") {
-    return { label: "คนเต็ม", level: 3, color: "#EF4444" };
-  }
-
-  if (status === "warning") {
-    return { label: "หนาแน่น", level: 3, color: "#EF4444" };
-  }
-
-  return { label: "ปกติ", level: 1, color: "#22C55E" };
 }
 
 function getDistanceBetweenStops(
@@ -419,7 +404,7 @@ function BusCard({
     isUsingRecommendedStop && stopEta
       ? formatEtaMinutes(stopEta)
       : formatDistanceEta(distanceToStopM, tele.speedKmh);
-  const density = getDensity(tele.status, tele.crowding);
+  const density = getCrowdingDisplay(tele.crowding);
   const routeLabel = `${tele.prevStopName} >> ${toStopName}`;
   const alertLabel = "แจ้งเตือน";
   const AlertIcon = isAlertEnabled ? BellRing : Bell;

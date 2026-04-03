@@ -1,6 +1,5 @@
 import { useState, useCallback } from "react";
 import { MapPin, Pencil, Undo2, Trash2, Copy, Check, Edit3 } from "lucide-react";
-import shuttleData from "../data/shuttle-data.json";
 import { AVAILABLE_ICONS } from "../lib/icons";
 
 const AVAILABLE_COLORS = [
@@ -12,13 +11,13 @@ const AVAILABLE_COLORS = [
     { name: "teal", class: "bg-teal-500", text: "text-teal-600", border: "border-teal-500" },
 ];
 
-type StopMarker = {
-    id: string;
-    position: [number, number];
-    name_th: string;
-    name_en: string;
-    icon?: string;
-    color?: string;
+export type StopMarker = {
+  id: string;
+  position: [number, number];
+  name_th: string;
+  name_en: string;
+  icon?: string;
+  color?: string;
 };
 
 type StopEditorControlsProps = {
@@ -254,18 +253,7 @@ export function StopEditorControls({
 // Hook for managing stop placement
 export function useStopEditor() {
     const [isPlacing, setIsPlacing] = useState(false);
-
-    // Initialize with data from JSON
-    const [stops, setStops] = useState<StopMarker[]>(() =>
-        shuttleData.stops.map((s) => ({
-            id: s.id,
-            position: [s.longitude, s.latitude],
-            name_th: s.name_th,
-            name_en: s.name_en,
-            icon: s.icon,
-            color: s.color
-        }))
-    );
+    const [stops, setStops] = useState<StopMarker[]>([]);
 
     const [editingIndex, setEditingIndex] = useState<number | null>(null);
 
@@ -318,6 +306,11 @@ export function useStopEditor() {
         setEditingIndex(null);
     }, []);
 
+    const loadStops = useCallback((nextStops: StopMarker[]) => {
+        setStops(nextStops);
+        setEditingIndex(null);
+    }, []);
+
     const exportStops = useCallback(() => {
         const stopsJson = stops.map((stop, index) => ({
             id: `stop-${index + 1}`,
@@ -347,6 +340,7 @@ export function useStopEditor() {
         updateStopName,
         undo,
         clear,
+        loadStops,
         exportStops,
     };
 }

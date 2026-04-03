@@ -389,8 +389,8 @@ export function DriverDemoScreen() {
   }
 
   return (
-    <main className={cn("min-h-[100dvh] bg-[#2a2a2a] text-white lg:grid lg:place-items-center lg:p-6", kanit.className)}>
-      <section className="relative w-full bg-[#252525] lg:max-w-[390px] lg:overflow-hidden lg:rounded-[30px] lg:border lg:border-white/8 lg:shadow-[0_28px_90px_rgba(0,0,0,0.45)]">
+    <main className={cn("h-[100dvh] overflow-hidden bg-[#2a2a2a] text-white lg:grid lg:place-items-center lg:p-6", kanit.className)}>
+      <section className="relative flex h-full w-full flex-col bg-[#252525] lg:max-w-[390px] lg:overflow-hidden lg:rounded-[30px] lg:border lg:border-white/8 lg:shadow-[0_28px_90px_rgba(0,0,0,0.45)]">
         {isModalOpen && (
           <div className="absolute inset-0 z-50 flex items-end justify-center p-0 lg:items-center">
             {/* Backdrop */}
@@ -458,7 +458,7 @@ export function DriverDemoScreen() {
           </div>
         )}
 
-        <div className="flex min-h-[100dvh] flex-col lg:min-h-0 lg:h-[calc(100dvh-48px)] lg:max-h-[860px]">
+        <div className="flex h-[100dvh] flex-col overflow-hidden lg:h-[calc(100dvh-48px)] lg:max-h-[860px]">
           {activeTab === "home" ? (
             <>
               <header className="px-5 pb-4 pt-5">
