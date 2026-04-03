@@ -258,7 +258,7 @@ function BackgroundTrackingNotice({ emphasized }: BackgroundTrackingNoticeProps)
       <div className="flex items-start gap-2.5">
         <TriangleAlert
           className={cn(
-            "mt-0.5 h-4 w-4 shrink-0",
+            "mt-0.5 h-4 w-4 shrink-0 mt-[18px]",
             emphasized ? "text-[#ffd47b]" : "text-white/55",
           )}
         />
@@ -389,8 +389,8 @@ export function DriverDemoScreen() {
   }
 
   return (
-    <main className={cn("h-[100dvh] overflow-hidden bg-[#2a2a2a] text-white lg:grid lg:place-items-center lg:p-6", kanit.className)}>
-      <section className="relative flex h-full w-full flex-col bg-[#252525] lg:max-w-[390px] lg:overflow-hidden lg:rounded-[30px] lg:border lg:border-white/8 lg:shadow-[0_28px_90px_rgba(0,0,0,0.45)]">
+    <main className={cn("min-h-[100dvh] bg-[#2a2a2a] text-white lg:grid lg:place-items-center lg:p-6", kanit.className)}>
+      <section className="relative w-full bg-[#252525] lg:max-w-[390px] lg:overflow-hidden lg:rounded-[30px] lg:border lg:border-white/8 lg:shadow-[0_28px_90px_rgba(0,0,0,0.45)]">
         {isModalOpen && (
           <div className="absolute inset-0 z-50 flex items-end justify-center p-0 lg:items-center">
             {/* Backdrop */}
@@ -458,7 +458,7 @@ export function DriverDemoScreen() {
           </div>
         )}
 
-        <div className="flex h-[100dvh] flex-col overflow-hidden lg:h-[calc(100dvh-48px)] lg:max-h-[860px]">
+        <div className="flex min-h-[100dvh] flex-col lg:min-h-0 lg:h-[calc(100dvh-48px)] lg:max-h-[860px]">
           {activeTab === "home" ? (
             <>
               <header className="px-5 pb-4 pt-5">
@@ -661,7 +661,7 @@ export function DriverDemoScreen() {
                     value={issueDetails}
                     onChange={(event) => setIssueDetails(event.target.value)}
                     placeholder="พิมพ์รายละเอียดเบื้องต้น..."
-                    className="mt-[13px] h-[140px] w-full resize-none rounded-[8px] border border-white/[0.12] bg-[linear-gradient(135deg,_#464646_0%,_#2e2e2e_100%)] px-4 py-4 text-[13px] leading-6 text-white/72 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] outline-none placeholder:text-white/24 transition focus:border-white/16"
+                    className="mt-[13px] h-[140px] mb-[18px] w-full resize-none rounded-[8px] border border-white/[0.12] bg-[linear-gradient(135deg,_#464646_0%,_#2e2e2e_100%)] px-4 py-4 text-[13px] leading-6 text-white/72 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] outline-none placeholder:text-white/24 transition focus:border-white/16"
                   />
 
                   <button
