@@ -42,8 +42,6 @@ main() {
   REPO_SSH_URL="${REPO_SSH_URL:-$origin_url}"
 
   : "${REPO_SSH_URL:?REPO_SSH_URL must be set}"
-  : "${GHCR_USERNAME:?GHCR_USERNAME must be set}"
-  : "${GHCR_TOKEN:?GHCR_TOKEN must be set}"
 
   [ -f "$deploy_key_path" ] || fail "Deploy key not found at $deploy_key_path"
   [ -f "$runtime_env_file" ] || fail "Runtime env file not found at $runtime_env_file"
@@ -68,9 +66,13 @@ REPO_SSH_URL=$REPO_SSH_URL
 DEPLOY_BRANCH=$deploy_branch
 DEPLOY_KEY_PATH=$deploy_key_path
 GIT_SSH_KNOWN_HOSTS=$known_hosts_file
-GHCR_USERNAME=$GHCR_USERNAME
-GHCR_TOKEN=$GHCR_TOKEN
 EOF
+  if [ -n "${GHCR_USERNAME:-}" ]; then
+    printf 'GHCR_USERNAME=%s\n' "$GHCR_USERNAME" >> "$pull_env_file"
+  fi
+  if [ -n "${GHCR_TOKEN:-}" ]; then
+    printf 'GHCR_TOKEN=%s\n' "$GHCR_TOKEN" >> "$pull_env_file"
+  fi
   chmod 600 "$pull_env_file"
 
   export GIT_SSH_COMMAND="ssh -i $deploy_key_path -o IdentitiesOnly=yes -o UserKnownHostsFile=$known_hosts_file -o StrictHostKeyChecking=yes"

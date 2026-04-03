@@ -34,7 +34,7 @@ Production now uses:
 
 1. GitHub Actions builds and pushes the app image to GHCR
 2. GitHub Actions publishes `production/manifest.env` plus the runtime bundle to the `deploy-state` branch
-3. The VM uses a deploy key to `git pull` the `deploy-state` branch and a read-only GHCR token to pull the desired image digest
+3. The VM uses a deploy key to `git pull` the `deploy-state` branch and pulls the desired image digest from GHCR
 4. A `systemd` timer runs the pull script every two minutes
 
 The runtime bundle is generated under `production/` on the `deploy-state` branch and contains:
@@ -79,6 +79,11 @@ REPO_SSH_URL=git@github.com:OWNER/REPO.git
 DEPLOY_BRANCH=deploy-state
 DEPLOY_KEY_PATH=/opt/tram/secrets/deploy_key
 GIT_SSH_KNOWN_HOSTS=/opt/tram/secrets/known_hosts
+```
+
+If the GHCR package is private, also add:
+
+```env
 GHCR_USERNAME=OWNER
 GHCR_TOKEN=github_pat_with_read_packages
 ```
@@ -91,6 +96,13 @@ GHCR_TOKEN=github_pat_with_read_packages
 2. Place the deploy key at `/opt/tram/secrets/deploy_key`
 3. Clone this repo on any branch once, or copy the bootstrap script from `deploy/production/bin/bootstrap.sh`
 4. Run the bootstrap script. It will write `/opt/tram/secrets/pull.env`, clone the `deploy-state` branch into `/opt/tram/control`, and install the systemd timer:
+
+```bash
+sudo REPO_SSH_URL=git@github.com:OWNER/REPO.git \
+  bash deploy/production/bin/bootstrap.sh
+```
+
+If the GHCR package is private, include:
 
 ```bash
 sudo GHCR_USERNAME=OWNER \

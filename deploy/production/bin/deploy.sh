@@ -136,8 +136,6 @@ main() {
   APP_HEALTH_TIMEOUT="${APP_HEALTH_TIMEOUT:-180}"
 
   : "${REPO_SSH_URL:?REPO_SSH_URL must be set in $PULL_ENV_FILE}"
-  : "${GHCR_USERNAME:?GHCR_USERNAME must be set in $PULL_ENV_FILE}"
-  : "${GHCR_TOKEN:?GHCR_TOKEN must be set in $PULL_ENV_FILE}"
 
   [ -f "$RUNTIME_ENV_FILE" ] || fail "Runtime env file not found at $RUNTIME_ENV_FILE"
 
@@ -179,7 +177,12 @@ main() {
 
   log "Deploying $DESIRED_IMAGE_REF"
   write_compose_env "$DESIRED_IMAGE_REF" "$COMPOSE_ENV_FILE"
-  printf '%s' "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USERNAME" --password-stdin >/dev/null
+  if [ -n "${GHCR_USERNAME:-}" ] && [ -n "${GHCR_TOKEN:-}" ]; then
+    log "Logging in to ghcr.io with configured credentials"
+    printf '%s' "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USERNAME" --password-stdin >/dev/null
+  else
+    log "No GHCR credentials configured, assuming the package is public"
+  fi
 
   if ! docker compose -f "$COMPOSE_FILE" --env-file "$COMPOSE_ENV_FILE" pull; then
     fail "docker compose pull failed"
