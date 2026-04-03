@@ -7,7 +7,7 @@ run_migrations() {
   attempt=1
 
   while [ "$attempt" -le "$attempts" ]; do
-    if pnpm prisma migrate deploy; then
+    if ./node_modules/.bin/prisma migrate deploy; then
       return 0
     fi
 
@@ -26,4 +26,4 @@ if [ "${RUN_DB_MIGRATIONS:-true}" = "true" ]; then
   run_migrations
 fi
 
-exec pnpm exec next start --hostname 0.0.0.0 --port "${PORT:-3000}"
+exec ./node_modules/.bin/next start --hostname 0.0.0.0 --port "${PORT:-3000}"

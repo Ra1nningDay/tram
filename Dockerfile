@@ -5,7 +5,10 @@ FROM node:22-bookworm-slim AS base
 ENV PNPM_HOME=/pnpm
 ENV PATH=$PNPM_HOME:$PATH
 
-RUN corepack enable
+ARG PNPM_VERSION=10.24.0
+
+RUN corepack enable \
+  && corepack prepare "pnpm@${PNPM_VERSION}" --activate
 
 FROM base AS deps
 WORKDIR /app
@@ -31,6 +34,10 @@ WORKDIR /app
 
 ENV NODE_ENV=production
 ENV PORT=3000
+
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends openssl \
+  && rm -rf /var/lib/apt/lists/*
 
 COPY package.json pnpm-lock.yaml ./
 COPY prisma.config.mjs ./prisma.config.mjs
