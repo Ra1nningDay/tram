@@ -17,6 +17,23 @@ type ReportResult =
   | { ok: true }
   | { ok: false; reason: "no-position" | "fetch-error" | "server-error" };
 
+async function stopReporting(vehicleId: string): Promise<void> {
+  try {
+    const res = await fetch("/api/gps/ingest", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ vehicle_id: vehicleId }),
+      credentials: "include",
+    });
+
+    if (!res.ok) {
+      console.warn("[useGpsReporter] stop failed:", res.status);
+    }
+  } catch {
+    console.warn("[useGpsReporter] stop failed: fetch-error");
+  }
+}
+
 async function reportPosition(
   position: GeolocationPosition,
   opts: GpsReporterOptions,
@@ -71,6 +88,7 @@ export function useGpsReporter(opts: GpsReporterOptions) {
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const hasSentInitialFixRef = useRef(false);
   const isReportingRef = useRef(false);
+  const activeVehicleIdRef = useRef<string | null>(null);
   const optsRef = useRef(opts);
 
   // Keep opts ref current without re-triggering the effect
@@ -114,6 +132,10 @@ export function useGpsReporter(opts: GpsReporterOptions) {
       return;
     }
 
+    if (watchIdRef.current !== null) {
+      return;
+    }
+
     // Continuously update the cached position
     watchIdRef.current = navigator.geolocation.watchPosition(
       (position) => {
@@ -141,12 +163,41 @@ export function useGpsReporter(opts: GpsReporterOptions) {
   }, [sendLatestPosition]);
 
   useEffect(() => {
-    if (opts.enabled) {
-      startWatching();
-    } else {
+    const previousVehicleId = activeVehicleIdRef.current;
+
+    if (!opts.enabled) {
       stopWatching();
+      activeVehicleIdRef.current = null;
+      if (previousVehicleId) {
+        void stopReporting(previousVehicleId);
+      }
+      return;
     }
 
-    return stopWatching;
-  }, [opts.enabled, startWatching, stopWatching]);
+    activeVehicleIdRef.current = opts.vehicleId;
+    startWatching();
+
+    if (previousVehicleId && previousVehicleId !== opts.vehicleId) {
+      void stopReporting(previousVehicleId);
+      hasSentInitialFixRef.current = false;
+    }
+
+    if (!hasSentInitialFixRef.current && latestPositionRef.current) {
+      hasSentInitialFixRef.current = true;
+      sendLatestPosition();
+    }
+  }, [opts.enabled, opts.vehicleId, sendLatestPosition, startWatching, stopWatching]);
+
+  useEffect(() => {
+    return () => {
+      const activeVehicleId = activeVehicleIdRef.current;
+
+      stopWatching();
+      activeVehicleIdRef.current = null;
+
+      if (activeVehicleId) {
+        void stopReporting(activeVehicleId);
+      }
+    };
+  }, [stopWatching]);
 }

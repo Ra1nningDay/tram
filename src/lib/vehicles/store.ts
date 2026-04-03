@@ -66,6 +66,14 @@ export function upsertVehicle(data: {
 }
 
 /**
+ * Remove a vehicle from the live in-memory store immediately.
+ * Returns true when the vehicle existed.
+ */
+export function removeVehicle(id: string): boolean {
+  return getStore().delete(id);
+}
+
+/**
  * Return all vehicles, applying staleness logic.
  */
 export function getAllVehicles(): Vehicle[] {

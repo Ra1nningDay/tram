@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import type { Vehicle } from "../features/shuttle/api";
 import { parseTramCsvFiltered } from "../lib/csv-parser";
+import { haversineM } from "../lib/geo/distance";
 import { useVehicleStream } from "../features/shuttle/useVehicleStream";
 import { shouldUseLiveVehicleFeed, type VehicleDataMode } from "../features/shuttle/live-mode";
 import {
@@ -35,18 +36,31 @@ const DEFAULT_SPEED_KMH = 20;
 type LiveCursor = {
     id: string;
     label: string;
-    /** Animated route distance (advances every frame via dead-reckoning) */
-    distanceM: number;
-    /** Latest GPS-snapped route distance (target for dead-reckoning) */
-    targetDistanceM: number;
+    /** Latest raw GPS coordinate from the driver / hardware feed */
+    latitude: number;
+    longitude: number;
+    /** Route-projected distance is still used for telemetry such as next stop */
+    routeDistanceM: number;
     /** Derived speed in km/h from consecutive GPS snapshots */
     speedKmh: number;
+    heading: number;
     direction: Vehicle["direction"];
     status: Vehicle["status"];
     last_updated: string;
     /** When the last GPS update was received (ms) */
     lastGpsMs: number;
 };
+
+function normalizeHeading(headingDeg: number): number {
+    const heading = headingDeg % 360;
+    return heading < 0 ? heading + 360 : heading;
+}
+
+function getHeading(from: [number, number], to: [number, number]): number {
+    const dx = to[0] - from[0];
+    const dy = to[1] - from[1];
+    return (Math.atan2(dx, dy) * 180) / Math.PI;
+}
 
 /* ------------------------------------------------------------------ */
 /*  Simulation cursor advance (mirrors useGpsReplay internals)         */
@@ -119,8 +133,8 @@ function advanceCursorMut(
  * between real-time SSE data and the CSV simulation fallback:
  *
  * • **Live mode** (SSE connected + vehicles present):
- *     Projects real GPS coordinates onto the route polyline and
- *     dead-reckons position between 5-second GPS updates at 60 fps.
+ *     Uses the latest raw GPS coordinates for map position while still
+ *     projecting onto the route polyline for ETA / next-stop telemetry.
  *
  * • **Simulation mode** (no live data):
  *     Falls back to the original CSV-replay animation unchanged.
@@ -212,25 +226,46 @@ export function useLiveOrSimVehicles(
         const nowMs = Date.now();
 
         for (const v of streamVehicles) {
-            const newDistanceM = projectGpsToRoute(v.latitude, v.longitude);
+            const newRouteDistanceM = projectGpsToRoute(v.latitude, v.longitude);
             const existing = liveCursorsRef.current.get(v.id);
 
             let speedKmh = DEFAULT_SPEED_KMH;
+            let heading =
+                typeof v.heading === "number"
+                    ? normalizeHeading(v.heading)
+                    : existing?.heading ?? 0;
+
             if (existing) {
-                // Derive speed from consecutive GPS snapshots
-                const deltaD = Math.abs(newDistanceM - existing.targetDistanceM);
+                // Derive speed from consecutive raw GPS snapshots
+                const deltaD = haversineM(
+                    [existing.longitude, existing.latitude],
+                    [v.longitude, v.latitude],
+                );
                 const deltaT = (nowMs - existing.lastGpsMs) / 1000; // seconds
-                if (deltaT > 0 && deltaD < ROUTE_TOTAL_M / 2) {
+                if (deltaT > 0 && deltaD < 1_000) {
                     speedKmh = Math.min((deltaD / deltaT) * 3.6, 80); // cap at 80 km/h
+                } else {
+                    speedKmh = existing.speedKmh;
+                }
+
+                if (typeof v.heading !== "number" && deltaD > 0.5) {
+                    heading = normalizeHeading(
+                        getHeading(
+                            [existing.longitude, existing.latitude],
+                            [v.longitude, v.latitude],
+                        ),
+                    );
                 }
             }
 
             liveCursorsRef.current.set(v.id, {
                 id: v.id,
                 label: v.label ?? v.id,
-                distanceM: existing?.distanceM ?? newDistanceM,
-                targetDistanceM: newDistanceM,
+                latitude: v.latitude,
+                longitude: v.longitude,
+                routeDistanceM: newRouteDistanceM,
                 speedKmh,
+                heading,
                 direction: v.direction,
                 status: v.status,
                 last_updated: v.last_updated,
@@ -262,31 +297,29 @@ export function useLiveOrSimVehicles(
         if (hasLiveData) {
             // ── Live mode ─────────────────────────────────────────────
             for (const cursor of liveCursorsRef.current.values()) {
-                const speedMPerMs = (cursor.speedKmh * 1000) / 3_600_000;
-
-                // Dead-reckon toward target, capped at real target distance
-                const advance = speedMPerMs * delta;
-                const remaining = cursor.targetDistanceM - cursor.distanceM;
-
-                if (Math.abs(remaining) > advance) {
-                    // Approaching target – advance step by step
-                    cursor.distanceM += Math.sign(remaining) * Math.min(advance, Math.abs(remaining));
-                } else {
-                    cursor.distanceM = cursor.targetDistanceM;
-                }
-
-                if (cursor.distanceM >= ROUTE_TOTAL_M) cursor.distanceM %= ROUTE_TOTAL_M;
-                if (cursor.distanceM < 0) cursor.distanceM = 0;
-
-                const pos = positionAtDistance(cursor.distanceM);
-                features.push(buildVehicleFeature(cursor.id, cursor.label, pos.lng, pos.lat, pos.heading));
-                newTelemetry.push(computeTelemetry(cursor.id, cursor.label, cursor.distanceM, cursor.speedKmh));
+                features.push(
+                    buildVehicleFeature(
+                        cursor.id,
+                        cursor.label,
+                        cursor.longitude,
+                        cursor.latitude,
+                        cursor.heading,
+                    ),
+                );
+                newTelemetry.push(
+                    computeTelemetry(
+                        cursor.id,
+                        cursor.label,
+                        cursor.routeDistanceM,
+                        cursor.speedKmh,
+                    ),
+                );
                 newVehicles.push({
                     id: cursor.id,
                     label: cursor.label,
-                    latitude: pos.lat,
-                    longitude: pos.lng,
-                    heading: pos.heading,
+                    latitude: cursor.latitude,
+                    longitude: cursor.longitude,
+                    heading: cursor.heading,
                     direction: cursor.direction,
                     last_updated: cursor.last_updated,
                     status: cursor.status,

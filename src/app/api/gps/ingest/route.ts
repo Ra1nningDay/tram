@@ -6,6 +6,7 @@ import { getPrisma } from "@/lib/prisma";
 import { publishVehicleUpdate } from "@/lib/redis";
 import { upsertVehicle } from "@/lib/vehicles/store";
 import { getAllVehicles } from "@/lib/vehicles/store";
+import { removeVehicle } from "@/lib/vehicles/store";
 import type { VehicleSource } from "@/lib/vehicles/store";
 
 export const runtime = "nodejs";
@@ -78,6 +79,22 @@ function validateBody(body: unknown): IngestBody | null {
   };
 }
 
+type DeleteBody = {
+  vehicle_id: string;
+};
+
+function validateDeleteBody(body: unknown): DeleteBody | null {
+  if (!body || typeof body !== "object") return null;
+  const b = body as Record<string, unknown>;
+  const vehicle_id = typeof b.vehicle_id === "string" ? b.vehicle_id.trim() : "";
+
+  if (!vehicle_id) {
+    return null;
+  }
+
+  return { vehicle_id };
+}
+
 // ── Handler ──────────────────────────────────────────────────────────────────
 
 export async function POST(req: NextRequest) {
@@ -146,4 +163,39 @@ export async function POST(req: NextRequest) {
   }
 
   return NextResponse.json({ ok: true, source }, { status: 200 });
+}
+
+export async function DELETE(req: NextRequest) {
+  const source = await resolveSource(req);
+  if (!source) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  let raw: unknown;
+  try {
+    raw = await req.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+  }
+
+  const body = validateDeleteBody(raw);
+  if (!body) {
+    return NextResponse.json(
+      {
+        error: "Bad Request",
+        message: "Required fields: vehicle_id (string)",
+      },
+      { status: 400 },
+    );
+  }
+
+  const removed = removeVehicle(body.vehicle_id);
+
+  try {
+    await publishVehicleUpdate(getAllVehicles());
+  } catch (err) {
+    console.error("[gps/ingest] redis publish failed:", err);
+  }
+
+  return NextResponse.json({ ok: true, removed, source }, { status: 200 });
 }
