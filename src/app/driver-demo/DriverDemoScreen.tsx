@@ -241,6 +241,36 @@ type BottomNavButtonProps = {
   onClick: () => void;
 };
 
+type BackgroundTrackingNoticeProps = {
+  emphasized: boolean;
+};
+
+function BackgroundTrackingNotice({ emphasized }: BackgroundTrackingNoticeProps) {
+  return (
+    <div
+      className={cn(
+        "rounded-[18px] border px-4 py-3 text-[12px] leading-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]",
+        emphasized
+          ? "border-[#f0c46a]/35 bg-[#5a4420]/45 text-[#ffe4a3]"
+          : "border-white/10 bg-white/[0.04] text-white/62",
+      )}
+    >
+      <div className="flex items-start gap-2.5">
+        <TriangleAlert
+          className={cn(
+            "mt-0.5 h-4 w-4 shrink-0",
+            emphasized ? "text-[#ffd47b]" : "text-white/55",
+          )}
+        />
+        <p>
+          เมื่อแอปอยู่เบื้องหลังหรือหน้าจอดับ browser อาจหยุดส่ง GPS ชั่วคราว ระบบจะเปลี่ยนรถเป็นล่าช้า
+          หรือออฟไลน์อัตโนมัติหากไม่มีตำแหน่งใหม่เข้ามา
+        </p>
+      </div>
+    </div>
+  );
+}
+
 function BottomNavButton({ active, icon: Icon, label, onClick }: BottomNavButtonProps) {
   return (
     <button
@@ -282,6 +312,7 @@ export function DriverDemoScreen() {
   const [issueDetails, setIssueDetails] = useState("");
   const [now, setNow] = useState(() => Date.now());
   const [startedAt, setStartedAt] = useState<number | null>(null);
+  const [hasBackgroundedWhileOnDuty, setHasBackgroundedWhileOnDuty] = useState(false);
 
   // ── GPS Reporting ──────────────────────────────────────────────────────────
   // Automatically starts when mode goes from "off" → "available"
@@ -304,11 +335,35 @@ export function DriverDemoScreen() {
     };
   }, []);
 
+  useEffect(() => {
+    if (mode === "off") {
+      setHasBackgroundedWhileOnDuty(false);
+    }
+  }, [mode]);
+
+  useEffect(() => {
+    if (typeof document === "undefined") {
+      return;
+    }
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "hidden" && mode !== "off") {
+        setHasBackgroundedWhileOnDuty(true);
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [mode]);
+
   const config = MODE_CONFIG[mode];
   const MainIcon = config.orbIcon;
   const elapsedLabel = formatDuration(startedAt ? now - startedAt : 0);
   const connectivityLabel = getConnectivityLabel(connectivityTone);
   const notificationLabel = getNotificationLabel(notificationTone);
+  const shouldShowBackgroundTrackingNotice = mode !== "off";
 
   function handlePrimaryAction() {
     startTransition(() => {
@@ -334,7 +389,7 @@ export function DriverDemoScreen() {
   }
 
   return (
-    <main className={cn("min-h-screen bg-[#2a2a2a] text-white lg:grid lg:place-items-center lg:p-6", kanit.className)}>
+    <main className={cn("min-h-[100dvh] bg-[#2a2a2a] text-white lg:grid lg:place-items-center lg:p-6", kanit.className)}>
       <section className="relative w-full bg-[#252525] lg:max-w-[390px] lg:overflow-hidden lg:rounded-[30px] lg:border lg:border-white/8 lg:shadow-[0_28px_90px_rgba(0,0,0,0.45)]">
         {isModalOpen && (
           <div className="absolute inset-0 z-50 flex items-end justify-center p-0 lg:items-center">
@@ -403,7 +458,7 @@ export function DriverDemoScreen() {
           </div>
         )}
 
-        <div className="flex min-h-screen flex-col lg:min-h-0 lg:h-[calc(100dvh-48px)] lg:max-h-[860px]">
+        <div className="flex min-h-[100dvh] flex-col lg:min-h-0 lg:h-[calc(100dvh-48px)] lg:max-h-[860px]">
           {activeTab === "home" ? (
             <>
               <header className="px-5 pb-4 pt-5">
@@ -441,6 +496,12 @@ export function DriverDemoScreen() {
                   <Clock3 className="h-4 w-4" />
                   {elapsedLabel}
                 </div>
+
+                {shouldShowBackgroundTrackingNotice && (
+                  <div className="mt-4">
+                    <BackgroundTrackingNotice emphasized={hasBackgroundedWhileOnDuty} />
+                  </div>
+                )}
               </div>
 
               <div className="flex flex-1 flex-col px-5 pb-0 pt-6">
@@ -526,6 +587,10 @@ export function DriverDemoScreen() {
 
               <div className="flex flex-1 flex-col overflow-y-auto">
                 <div className="px-[35px] pt-[28px]">
+                  {shouldShowBackgroundTrackingNotice && (
+                    <BackgroundTrackingNotice emphasized={hasBackgroundedWhileOnDuty} />
+                  )}
+
                   <div className="grid grid-cols-2 gap-[36px]">
                     <AlertStatusButton
                       icon={Wifi}
@@ -610,7 +675,7 @@ export function DriverDemoScreen() {
             </>
           )}
 
-          <nav className="relative mt-auto grid grid-cols-2 items-end gap-2 bg-[#060606] px-6 pb-2 pt-3">
+          <nav className="sticky bottom-0 z-20 mt-auto grid grid-cols-2 items-end gap-2 border-t border-white/10 bg-[#060606]/95 px-6 pb-2 pt-3 shadow-[0_-18px_48px_rgba(0,0,0,0.4)] backdrop-blur-xl [padding-bottom:calc(env(safe-area-inset-bottom)+0.5rem)]">
             <BottomNavButton
               active={activeTab === "home"}
               icon={BusFront}

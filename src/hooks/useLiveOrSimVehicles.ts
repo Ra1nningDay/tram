@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import type { Vehicle } from "../features/shuttle/api";
 import { parseTramCsvFiltered } from "../lib/csv-parser";
 import { haversineM } from "../lib/geo/distance";
+import { deriveVehicleStatus } from "../lib/vehicles/status";
 import { useVehicleStream } from "../features/shuttle/useVehicleStream";
 import { shouldUseLiveVehicleFeed, type VehicleDataMode } from "../features/shuttle/live-mode";
 import {
@@ -33,7 +34,7 @@ const DEFAULT_SPEED_KMH = 20;
 /*  Live cursor — tracks each real vehicle between GPS updates         */
 /* ------------------------------------------------------------------ */
 
-type LiveCursor = {
+export type LiveCursor = {
     id: string;
     label: string;
     /** Latest raw GPS coordinate from the driver / hardware feed */
@@ -51,6 +52,98 @@ type LiveCursor = {
     /** When the last GPS update was received (ms) */
     lastGpsMs: number;
 };
+
+export function syncLiveCursors(
+    liveCursors: Map<string, LiveCursor>,
+    streamVehicles: Vehicle[],
+    nowMs: number,
+) {
+    const activeVehicleIds = new Set<string>();
+
+    for (const v of streamVehicles) {
+        activeVehicleIds.add(v.id);
+        const newRouteDistanceM = projectGpsToRoute(v.latitude, v.longitude);
+        const existing = liveCursors.get(v.id);
+
+        let speedKmh = DEFAULT_SPEED_KMH;
+        let heading =
+            typeof v.heading === "number"
+                ? normalizeHeading(v.heading)
+                : existing?.heading ?? 0;
+
+        if (existing) {
+            const deltaD = haversineM(
+                [existing.longitude, existing.latitude],
+                [v.longitude, v.latitude],
+            );
+            const deltaT = (nowMs - existing.lastGpsMs) / 1000;
+
+            if (deltaT > 0 && deltaD < 1_000) {
+                speedKmh = Math.min((deltaD / deltaT) * 3.6, 80);
+            } else {
+                speedKmh = existing.speedKmh;
+            }
+
+            if (typeof v.heading !== "number" && deltaD > 0.5) {
+                heading = normalizeHeading(
+                    getHeading(
+                        [existing.longitude, existing.latitude],
+                        [v.longitude, v.latitude],
+                    ),
+                );
+            }
+        }
+
+        liveCursors.set(v.id, {
+            id: v.id,
+            label: v.label ?? v.id,
+            latitude: v.latitude,
+            longitude: v.longitude,
+            routeDistanceM: newRouteDistanceM,
+            speedKmh,
+            heading,
+            crowding: v.crowding,
+            direction: v.direction,
+            status: v.status,
+            last_updated: v.last_updated,
+            lastGpsMs: nowMs,
+        });
+    }
+
+    for (const id of liveCursors.keys()) {
+        if (!activeVehicleIds.has(id)) {
+            liveCursors.delete(id);
+        }
+    }
+}
+
+export function getVisibleLiveCursors(
+    liveCursors: Map<string, LiveCursor>,
+    nowMs: number,
+): LiveCursor[] {
+    const hiddenIds: string[] = [];
+    const visibleCursors: LiveCursor[] = [];
+
+    for (const cursor of liveCursors.values()) {
+        const status = deriveVehicleStatus(cursor.last_updated, nowMs);
+
+        if (status === "hidden") {
+            hiddenIds.push(cursor.id);
+            continue;
+        }
+
+        visibleCursors.push({
+            ...cursor,
+            status,
+        });
+    }
+
+    for (const id of hiddenIds) {
+        liveCursors.delete(id);
+    }
+
+    return visibleCursors;
+}
 
 function normalizeHeading(headingDeg: number): number {
     const heading = headingDeg % 360;
@@ -225,62 +318,7 @@ export function useLiveOrSimVehicles(
         if (!hasLiveData) return;
 
         const nowMs = Date.now();
-
-        for (const v of streamVehicles) {
-            const newRouteDistanceM = projectGpsToRoute(v.latitude, v.longitude);
-            const existing = liveCursorsRef.current.get(v.id);
-
-            let speedKmh = DEFAULT_SPEED_KMH;
-            let heading =
-                typeof v.heading === "number"
-                    ? normalizeHeading(v.heading)
-                    : existing?.heading ?? 0;
-
-            if (existing) {
-                // Derive speed from consecutive raw GPS snapshots
-                const deltaD = haversineM(
-                    [existing.longitude, existing.latitude],
-                    [v.longitude, v.latitude],
-                );
-                const deltaT = (nowMs - existing.lastGpsMs) / 1000; // seconds
-                if (deltaT > 0 && deltaD < 1_000) {
-                    speedKmh = Math.min((deltaD / deltaT) * 3.6, 80); // cap at 80 km/h
-                } else {
-                    speedKmh = existing.speedKmh;
-                }
-
-                if (typeof v.heading !== "number" && deltaD > 0.5) {
-                    heading = normalizeHeading(
-                        getHeading(
-                            [existing.longitude, existing.latitude],
-                            [v.longitude, v.latitude],
-                        ),
-                    );
-                }
-            }
-
-            liveCursorsRef.current.set(v.id, {
-                id: v.id,
-                label: v.label ?? v.id,
-                latitude: v.latitude,
-                longitude: v.longitude,
-                routeDistanceM: newRouteDistanceM,
-                speedKmh,
-                heading,
-                crowding: v.crowding,
-                direction: v.direction,
-                status: v.status,
-                last_updated: v.last_updated,
-                lastGpsMs: nowMs,
-            });
-        }
-
-        // Remove vehicles that are no longer in the stream
-        for (const id of liveCursorsRef.current.keys()) {
-            if (!streamVehicles.some((v) => v.id === id)) {
-                liveCursorsRef.current.delete(id);
-            }
-        }
+        syncLiveCursors(liveCursorsRef.current, streamVehicles, nowMs);
 
         // Show as loaded immediately once we have live data
         setLoading(false);
@@ -291,6 +329,7 @@ export function useLiveOrSimVehicles(
         const now = performance.now();
         const delta = Math.min(now - lastFrameRef.current, 100);
         lastFrameRef.current = now;
+        const nowMs = Date.now();
 
         const features: ReturnType<typeof buildVehicleFeature>[] = [];
         const newTelemetry: VehicleTelemetry[] = [];
@@ -298,7 +337,7 @@ export function useLiveOrSimVehicles(
 
         if (hasLiveData) {
             // ── Live mode ─────────────────────────────────────────────
-            for (const cursor of liveCursorsRef.current.values()) {
+            for (const cursor of getVisibleLiveCursors(liveCursorsRef.current, nowMs)) {
                 features.push(
                     buildVehicleFeature(
                         cursor.id,

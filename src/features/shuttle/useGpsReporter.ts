@@ -19,12 +19,36 @@ type ReportResult =
   | { ok: true }
   | { ok: false; reason: "no-position" | "fetch-error" | "server-error" };
 
-async function stopReporting(vehicleId: string): Promise<void> {
+export async function finalizeGpsReporterStop(
+  pendingReport: Promise<unknown> | null,
+  stop: () => Promise<void>,
+): Promise<void> {
+  try {
+    await pendingReport;
+  } catch {
+    // Best effort: still attempt to delete the session on the server.
+  }
+
+  await stop();
+}
+
+function createReporterSessionId() {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+
+  return `gps-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+async function stopReporting(vehicleId: string, sessionId?: string | null): Promise<void> {
   try {
     const res = await fetch("/api/gps/ingest", {
       method: "DELETE",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ vehicle_id: vehicleId }),
+      body: JSON.stringify({
+        vehicle_id: vehicleId,
+        session_id: sessionId ?? undefined,
+      }),
       credentials: "include",
     });
 
@@ -39,6 +63,7 @@ async function stopReporting(vehicleId: string): Promise<void> {
 async function reportPosition(
   position: GeolocationPosition,
   opts: GpsReporterOptions,
+  sessionId: string,
 ): Promise<ReportResult> {
   const { vehicleId, vehicleLabel, direction } = opts;
 
@@ -56,6 +81,7 @@ async function reportPosition(
         speed: position.coords.speed ?? undefined,
         direction: direction ?? "outbound",
         crowding: opts.crowding ?? "normal",
+        session_id: sessionId,
       }),
       credentials: "include", // send session cookie
     });
@@ -91,7 +117,10 @@ export function useGpsReporter(opts: GpsReporterOptions) {
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const hasSentInitialFixRef = useRef(false);
   const isReportingRef = useRef(false);
+  const reportPromiseRef = useRef<Promise<ReportResult> | null>(null);
+  const reportSequenceRef = useRef(0);
   const activeVehicleIdRef = useRef<string | null>(null);
+  const activeSessionIdRef = useRef<string | null>(null);
   const activeCrowdingRef = useRef<Vehicle["crowding"]>("normal");
   const optsRef = useRef(opts);
 
@@ -102,17 +131,27 @@ export function useGpsReporter(opts: GpsReporterOptions) {
 
   const sendLatestPosition = useCallback(() => {
     const pos = latestPositionRef.current;
-    if (!pos || isReportingRef.current) return;
+    const sessionId = activeSessionIdRef.current;
+    if (!pos || isReportingRef.current || !sessionId) return;
 
     isReportingRef.current = true;
-    void reportPosition(pos, optsRef.current)
+    const reportSequence = ++reportSequenceRef.current;
+    const pendingReport = reportPosition(pos, optsRef.current, sessionId);
+    reportPromiseRef.current = pendingReport;
+
+    void pendingReport
       .then((result) => {
         if (!result.ok) {
           console.warn("[useGpsReporter] report failed:", result.reason);
         }
       })
       .finally(() => {
-        isReportingRef.current = false;
+        if (reportPromiseRef.current === pendingReport) {
+          reportPromiseRef.current = null;
+        }
+        if (reportSequenceRef.current === reportSequence) {
+          isReportingRef.current = false;
+        }
       });
   }, []);
 
@@ -127,7 +166,7 @@ export function useGpsReporter(opts: GpsReporterOptions) {
     }
     latestPositionRef.current = null;
     hasSentInitialFixRef.current = false;
-    isReportingRef.current = false;
+    isReportingRef.current = reportPromiseRef.current !== null;
   }, []);
 
   const startWatching = useCallback(() => {
@@ -166,18 +205,38 @@ export function useGpsReporter(opts: GpsReporterOptions) {
     }, REPORT_INTERVAL_MS);
   }, [sendLatestPosition]);
 
+  const stopVehicleSession = useCallback((
+    vehicleId: string | null,
+    sessionId: string | null,
+    pendingReport: Promise<ReportResult> | null,
+  ) => {
+    if (!vehicleId) {
+      return;
+    }
+
+    void finalizeGpsReporterStop(
+      pendingReport,
+      () => stopReporting(vehicleId, sessionId),
+    );
+  }, []);
+
   useEffect(() => {
     const previousVehicleId = activeVehicleIdRef.current;
+    const previousSessionId = activeSessionIdRef.current;
     const previousCrowding = activeCrowdingRef.current;
+    const pendingReport = reportPromiseRef.current;
 
     if (!opts.enabled) {
       stopWatching();
       activeVehicleIdRef.current = null;
+      activeSessionIdRef.current = null;
       activeCrowdingRef.current = "normal";
-      if (previousVehicleId) {
-        void stopReporting(previousVehicleId);
-      }
+      stopVehicleSession(previousVehicleId, previousSessionId, pendingReport);
       return;
+    }
+
+    if (!previousSessionId || previousVehicleId !== opts.vehicleId) {
+      activeSessionIdRef.current = createReporterSessionId();
     }
 
     activeVehicleIdRef.current = opts.vehicleId;
@@ -185,7 +244,7 @@ export function useGpsReporter(opts: GpsReporterOptions) {
     startWatching();
 
     if (previousVehicleId && previousVehicleId !== opts.vehicleId) {
-      void stopReporting(previousVehicleId);
+      stopVehicleSession(previousVehicleId, previousSessionId, pendingReport);
       hasSentInitialFixRef.current = false;
     }
 
@@ -204,20 +263,21 @@ export function useGpsReporter(opts: GpsReporterOptions) {
     opts.crowding,
     sendLatestPosition,
     startWatching,
+    stopVehicleSession,
     stopWatching,
   ]);
 
   useEffect(() => {
     return () => {
       const activeVehicleId = activeVehicleIdRef.current;
+      const activeSessionId = activeSessionIdRef.current;
+      const pendingReport = reportPromiseRef.current;
 
       stopWatching();
       activeVehicleIdRef.current = null;
+      activeSessionIdRef.current = null;
       activeCrowdingRef.current = "normal";
-
-      if (activeVehicleId) {
-        void stopReporting(activeVehicleId);
-      }
+      stopVehicleSession(activeVehicleId, activeSessionId, pendingReport);
     };
-  }, [stopWatching]);
+  }, [stopVehicleSession, stopWatching]);
 }

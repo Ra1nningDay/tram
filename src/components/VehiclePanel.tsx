@@ -704,11 +704,14 @@ function VehicleListContent({
   useEffect(() => {
     if (!selectedVehicleId || !listRef.current) return;
 
-    const target = listRef.current.querySelector<HTMLElement>(
-      `[data-vehicle-id="${selectedVehicleId}"]`
-    );
+    setTimeout(() => {
+      if (!listRef.current) return;
+      const target = listRef.current.querySelector<HTMLElement>(
+        `[data-vehicle-id="${selectedVehicleId}"]`
+      );
 
-    target?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+      target?.scrollIntoView({ block: "start", behavior: "smooth" });
+    }, 100);
   }, [selectedVehicleId]);
 
   return (
@@ -789,58 +792,74 @@ export function VehiclePanel({
       })
       .filter((item): item is PanelVehicleItem => item !== null);
 
-    if (!stop) {
-      return baseItems;
-    }
+    let resultItems = baseItems;
 
-    const byVehicleId = new Map<string, PanelVehicleItem>();
-    const byLabel = new Map<string, PanelVehicleItem>();
+    if (stop) {
+      const byVehicleId = new Map<string, PanelVehicleItem>();
+      const byLabel = new Map<string, PanelVehicleItem>();
 
-    for (const item of baseItems) {
-      const vehicleIdKey = normalizeLookupKey(item.vehicleId);
-      const labelKey = normalizeLookupKey(item.tele.label);
+      for (const item of baseItems) {
+        const vehicleIdKey = normalizeLookupKey(item.vehicleId);
+        const labelKey = normalizeLookupKey(item.tele.label);
 
-      if (vehicleIdKey) {
-        byVehicleId.set(vehicleIdKey, item);
-      }
-      if (labelKey) {
-        byLabel.set(labelKey, item);
-      }
-    }
-
-    const matchedItems: PanelVehicleItem[] = [];
-    const seenVehicleIds = new Set<string>();
-
-    for (const eta of stopEtas) {
-      const labelKey =
-        normalizeLookupKey(eta.vehicle_label) ?? normalizeLookupKey(eta.line_name);
-      const vehicleIdKey = normalizeLookupKey(eta.vehicle_id);
-      const match =
-        (labelKey ? byLabel.get(labelKey) : undefined) ??
-        (vehicleIdKey ? byVehicleId.get(vehicleIdKey) : undefined);
-
-      if (!match || seenVehicleIds.has(match.vehicleId)) {
-        continue;
+        if (vehicleIdKey) {
+          byVehicleId.set(vehicleIdKey, item);
+        }
+        if (labelKey) {
+          byLabel.set(labelKey, item);
+        }
       }
 
-      seenVehicleIds.add(match.vehicleId);
-      matchedItems.push({
-        ...match,
-        key: `${match.vehicleId}-${eta.vehicle_id ?? eta.vehicle_label ?? "eta"}`,
-        stopEta: eta,
-        contextStopName: stop.name_th,
-      });
+      const matchedItems: PanelVehicleItem[] = [];
+      const seenVehicleIds = new Set<string>();
+
+      for (const eta of stopEtas) {
+        const labelKey =
+          normalizeLookupKey(eta.vehicle_label) ?? normalizeLookupKey(eta.line_name);
+        const vehicleIdKey = normalizeLookupKey(eta.vehicle_id);
+        const match =
+          (labelKey ? byLabel.get(labelKey) : undefined) ??
+          (vehicleIdKey ? byVehicleId.get(vehicleIdKey) : undefined);
+
+        if (!match || seenVehicleIds.has(match.vehicleId)) {
+          continue;
+        }
+
+        seenVehicleIds.add(match.vehicleId);
+        matchedItems.push({
+          ...match,
+          key: `${match.vehicleId}-${eta.vehicle_id ?? eta.vehicle_label ?? "eta"}`,
+          stopEta: eta,
+          contextStopName: stop.name_th,
+        });
+      }
+
+      if (matchedItems.length > 0) {
+        resultItems = matchedItems;
+      } else {
+        resultItems = baseItems.map((item) => ({
+          ...item,
+          contextStopName: stop.name_th,
+        }));
+      }
     }
 
-    if (matchedItems.length > 0) {
-      return matchedItems;
+    if (selectedVehicleId) {
+      const selectedIndex = resultItems.findIndex(
+        (item) => item.vehicleId === selectedVehicleId
+      );
+      if (selectedIndex > 0) {
+        const item = resultItems[selectedIndex];
+        resultItems = [
+          item,
+          ...resultItems.slice(0, selectedIndex),
+          ...resultItems.slice(selectedIndex + 1),
+        ];
+      }
     }
 
-    return baseItems.map((item) => ({
-      ...item,
-      contextStopName: stop.name_th,
-    }));
-  }, [stop, stopEtas, telemetry, vehicles]);
+    return resultItems;
+  }, [stop, stopEtas, telemetry, vehicles, selectedVehicleId]);
 
   const setSnapLevel = (nextLevel: 0 | 1 | 2) => {
     if (snapLevel === undefined) {
@@ -892,7 +911,7 @@ export function VehiclePanel({
           />
 
           <div
-            className={`min-h-0 flex-1 transition-opacity duration-300 ${currentSnapLevel > 0 ? "opacity-100" : "pointer-events-none opacity-0"
+            className={`flex flex-col min-h-0 flex-1 transition-opacity duration-300 ${currentSnapLevel > 0 ? "opacity-100" : "pointer-events-none opacity-0"
               }`}
             style={{ marginTop: MOBILE_HEADER_HEIGHT }}
           >

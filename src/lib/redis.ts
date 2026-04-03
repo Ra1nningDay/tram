@@ -1,5 +1,6 @@
 import Redis from "ioredis";
 import type { Vehicle } from "@/features/shuttle/api";
+import { normalizeLiveVehicleFeed } from "@/lib/vehicles/status";
 
 // ── Channels ────────────────────────────────────────────────────────────────
 export const CHANNEL_VEHICLES = "vehicles:update";
@@ -142,7 +143,7 @@ export async function readVehicleSnapshot(): Promise<Vehicle[] | null> {
     }
 
     const parsed = JSON.parse(raw) as Vehicle[];
-    return Array.isArray(parsed) ? parsed : null;
+    return Array.isArray(parsed) ? normalizeLiveVehicleFeed(parsed) : null;
   } catch {
     return null;
   }
@@ -157,11 +158,12 @@ export async function publishVehicleUpdate(
   const isReady = await ensureRedisReady(redisPublisher);
   if (!isReady) return;
 
+  const normalizedVehicles = normalizeLiveVehicleFeed(vehicles);
   const payload: VehicleUpdatePayload = {
     server_time: new Date().toISOString(),
-    vehicles,
+    vehicles: normalizedVehicles,
   };
 
-  await redisPublisher.set(VEHICLE_SNAPSHOT_KEY, JSON.stringify(vehicles));
+  await redisPublisher.set(VEHICLE_SNAPSHOT_KEY, JSON.stringify(normalizedVehicles));
   await redisPublisher.publish(CHANNEL_VEHICLES, JSON.stringify(payload));
 }

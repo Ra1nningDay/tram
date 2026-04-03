@@ -47,6 +47,7 @@ async function resolveSource(req: NextRequest): Promise<VehicleSource | null> {
 
 type IngestBody = {
   vehicle_id: string;
+  session_id?: string;
   label?: string;
   latitude: number;
   longitude: number;
@@ -70,6 +71,7 @@ function validateBody(body: unknown): IngestBody | null {
 
   return {
     vehicle_id,
+    session_id: typeof b.session_id === "string" ? b.session_id.trim() || undefined : undefined,
     label: typeof b.label === "string" ? b.label : undefined,
     latitude,
     longitude,
@@ -83,6 +85,7 @@ function validateBody(body: unknown): IngestBody | null {
 
 type DeleteBody = {
   vehicle_id: string;
+  session_id?: string;
 };
 
 function validateDeleteBody(body: unknown): DeleteBody | null {
@@ -94,7 +97,10 @@ function validateDeleteBody(body: unknown): DeleteBody | null {
     return null;
   }
 
-  return { vehicle_id };
+  return {
+    vehicle_id,
+    session_id: typeof b.session_id === "string" ? b.session_id.trim() || undefined : undefined,
+  };
 }
 
 // ── Handler ──────────────────────────────────────────────────────────────────
@@ -137,6 +143,7 @@ export async function POST(req: NextRequest) {
     direction: body.direction ?? "outbound",
     source,
     crowding: body.crowding,
+    sessionId: body.session_id,
   });
 
   // 4. Persist GPS history to PostgreSQL (fire-and-forget)
@@ -192,7 +199,7 @@ export async function DELETE(req: NextRequest) {
     );
   }
 
-  const removed = removeVehicle(body.vehicle_id);
+  const removed = removeVehicle(body.vehicle_id, body.session_id);
 
   try {
     await publishVehicleUpdate(getAllVehicles());

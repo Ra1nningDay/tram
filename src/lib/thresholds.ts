@@ -1,5 +1,5 @@
 export const STATUS_THRESHOLDS = {
-  freshSeconds: 15,
   delayedSeconds: 60,
-  offlineSeconds: 120,
+  offlineSeconds: 5 * 60,
+  hiddenSeconds: 10 * 60,
 };

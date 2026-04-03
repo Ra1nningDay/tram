@@ -1,4 +1,5 @@
 import type { Vehicle } from "@/features/shuttle/api";
+import { deriveVehicleStatus } from "@/lib/vehicles/status";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -7,6 +8,7 @@ export type VehicleSource = "hardware" | "driver";
 export type IngestedVehicle = Vehicle & {
   speed?: number;
   source: VehicleSource;
+  sessionId?: string;
   receivedAt: Date;
 };
 
@@ -28,8 +30,6 @@ function getStore(): Map<string, IngestedVehicle> {
 
 // ── Public API ───────────────────────────────────────────────────────────────
 
-const STALE_THRESHOLD_MS = 5 * 60 * 1000; // 5 minutes → mark offline
-
 /**
  * Upsert the latest position for a vehicle.
  * Returns the updated vehicle record.
@@ -44,6 +44,7 @@ export function upsertVehicle(data: {
   direction: "outbound" | "inbound";
   source: VehicleSource;
   crowding?: Vehicle["crowding"];
+  sessionId?: string;
 }): IngestedVehicle {
   const store = getStore();
   const now = new Date();
@@ -57,6 +58,7 @@ export function upsertVehicle(data: {
     speed: data.speed,
     direction: data.direction,
     source: data.source,
+    sessionId: data.sessionId,
     last_updated: now.toISOString(),
     status: "fresh",
     crowding: data.crowding,
@@ -71,8 +73,19 @@ export function upsertVehicle(data: {
  * Remove a vehicle from the live in-memory store immediately.
  * Returns true when the vehicle existed.
  */
-export function removeVehicle(id: string): boolean {
-  return getStore().delete(id);
+export function removeVehicle(id: string, sessionId?: string): boolean {
+  const store = getStore();
+  const current = store.get(id);
+
+  if (!current) {
+    return false;
+  }
+
+  if (sessionId && current.sessionId && current.sessionId !== sessionId) {
+    return false;
+  }
+
+  return store.delete(id);
 }
 
 /**
@@ -80,18 +93,19 @@ export function removeVehicle(id: string): boolean {
  */
 export function getAllVehicles(): Vehicle[] {
   const store = getStore();
-  const now = Date.now();
+  const nowMs = Date.now();
+  const hiddenVehicleIds: string[] = [];
+  const vehicles: Vehicle[] = [];
 
-  return Array.from(store.values()).map((v) => {
-    const ageMs = now - v.receivedAt.getTime();
-    const status =
-      ageMs > STALE_THRESHOLD_MS
-        ? "offline"
-        : ageMs > 60_000 // > 1 min → delayed
-          ? "delayed"
-          : "fresh";
+  for (const v of store.values()) {
+    const status = deriveVehicleStatus(v.last_updated, nowMs);
 
-    return {
+    if (status === "hidden") {
+      hiddenVehicleIds.push(v.id);
+      continue;
+    }
+
+    vehicles.push({
       id: v.id,
       label: v.label,
       latitude: v.latitude,
@@ -101,8 +115,14 @@ export function getAllVehicles(): Vehicle[] {
       last_updated: v.last_updated,
       status,
       crowding: v.crowding,
-    } satisfies Vehicle;
-  });
+    } satisfies Vehicle);
+  }
+
+  for (const vehicleId of hiddenVehicleIds) {
+    store.delete(vehicleId);
+  }
+
+  return vehicles;
 }
 
 /** True when at least one vehicle has been ingested (not mock). */

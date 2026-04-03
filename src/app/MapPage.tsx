@@ -109,7 +109,7 @@ export function MapPage() {
   const [isAlertEnabled, setIsAlertEnabled] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [isSearchOpen, setIsSearchOpen] = useState(false);
-  const [panelSnapLevel, setPanelSnapLevel] = useState<PanelSnapLevel>(1);
+  const [panelSnapLevel, setPanelSnapLevel] = useState<PanelSnapLevel>(0);
   const [autoExpandVehicleRequest, setAutoExpandVehicleRequest] = useState<string | null>(null);
   const mapRef = useRef<MapRef | null>(null);
   const selectedVehicleIdRef = useRef<string | null>(null);
@@ -425,9 +425,21 @@ export function MapPage() {
     setSelectedVehicleId(nextVehicleId);
   }, [selectedVehicleId]);
 
+  const handleClearSelection = useCallback(() => {
+    setSelectedVehicleId(null);
+    setSelectedStopId(null);
+    setAutoExpandVehicleRequest(null);
+    setPanelSnapLevel(0);
+    userManuallySelectedRef.current = false;
+  }, []);
+
   const handleSelectVehicleFromMap = useCallback((id: string | null) => {
-    handleSelectVehicle(id, { panelSnapLevel: 2 });
-  }, [handleSelectVehicle]);
+    if (id === null) {
+      handleClearSelection();
+    } else {
+      handleSelectVehicle(id, { panelSnapLevel: 1 });
+    }
+  }, [handleSelectVehicle, handleClearSelection]);
 
   const handleSelectVehicleFromPanel = useCallback((id: string | null) => {
     handleSelectVehicle(id);
@@ -450,13 +462,19 @@ export function MapPage() {
 
   const handleSelectStop = useCallback(
     (stopId: string) => {
-      setSelectedStopId((prev) => (prev === stopId ? null : stopId));
+      const nextStopId = selectedStopId === stopId ? null : stopId;
+      setSelectedStopId(nextStopId);
       setSelectedVehicleId(null);
       setAutoExpandVehicleRequest(null);
       userManuallySelectedRef.current = true;
+      
+      if (nextStopId !== null) {
+        setPanelSnapLevel(1);
+      }
+      
       flyToStop(stopId);
     },
-    [flyToStop]
+    [flyToStop, selectedStopId]
   );
 
   const focusStopFromSearch = useCallback((stopId: string) => {

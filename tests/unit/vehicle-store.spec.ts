@@ -29,4 +29,21 @@ describe("vehicle store", () => {
     expect(removeVehicle("TRAM-8")).toBe(true);
     expect(getAllVehicles()).toHaveLength(0);
   });
+
+  it("does not remove a newer vehicle session with a stale stop request", () => {
+    upsertVehicle({
+      id: "TRAM-8",
+      label: "TRAM-8",
+      latitude: 13.612,
+      longitude: 100.837,
+      direction: "outbound",
+      source: "driver",
+      sessionId: "session-new",
+    });
+
+    expect(removeVehicle("TRAM-8", "session-old")).toBe(false);
+    expect(getAllVehicles()).toHaveLength(1);
+    expect(removeVehicle("TRAM-8", "session-new")).toBe(true);
+    expect(getAllVehicles()).toHaveLength(0);
+  });
 });
