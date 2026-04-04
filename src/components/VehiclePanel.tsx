@@ -3,6 +3,7 @@ import { Bell, BellRing, Bus, ChevronDown, ChevronUp, Clock, MapPin, User, X } f
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import type { Eta, Stop, Vehicle, VehicleTelemetry } from "../features/shuttle/api";
+import { StatusBadge } from "./StatusBadge";
 import { formatDistance, formatWalkingTime } from "../lib/format-distance";
 import { STOPS_ON_ROUTE } from "../hooks/useGpsReplay";
 import { getCrowdingDisplay } from "../lib/vehicles/crowding";
@@ -10,6 +11,7 @@ import { getCrowdingDisplay } from "../lib/vehicles/crowding";
 interface VehiclePanelProps {
   vehicles: Vehicle[];
   telemetry: VehicleTelemetry[];
+  liveMode?: boolean;
   onSelectVehicle?: (id: string | null) => void;
   selectedVehicleId?: string | null;
   snapLevel?: 0 | 1 | 2;
@@ -28,6 +30,7 @@ interface VehiclePanelProps {
 type PanelVehicleItem = {
   key: string;
   vehicleId: string;
+  vehicleStatus: Vehicle["status"];
   tele: VehicleTelemetry;
   stopEta?: Eta;
   contextStopName?: string;
@@ -353,8 +356,28 @@ function EmptyArrivalState({ stopName }: { stopName: string }) {
   );
 }
 
+function EmptyVehicleState({ liveMode = false }: { liveMode?: boolean }) {
+  return (
+    <div className="px-3 pb-3">
+      <div className="rounded-[24px] border border-dashed border-[var(--glass-border)] bg-[var(--color-surface-dark)]/45 px-4 py-6 text-center">
+        <p className="text-sm font-semibold text-[var(--color-text)]">
+          {liveMode
+            ? "ยังไม่มีรถที่ส่ง GPS อยู่ตอนนี้"
+            : "ยังไม่มีข้อมูลรถสำหรับโหมดนี้"}
+        </p>
+        <p className="mt-1 text-xs text-[var(--color-text-muted)]">
+          {liveMode
+            ? "ระบบยังอยู่ใน Live GPS Mode และกำลังรอสัญญาณจากคนขับ"
+            : "ลองสลับโหมดหรือรอข้อมูลชุดถัดไป"}
+        </p>
+      </div>
+    </div>
+  );
+}
+
 function BusCard({
   tele,
+  vehicleStatus,
   isSelected,
   onSelect,
   contextStopName,
@@ -365,6 +388,7 @@ function BusCard({
   onToggleAlert,
 }: {
   tele: VehicleTelemetry;
+  vehicleStatus: Vehicle["status"];
   isSelected: boolean;
   onSelect: () => void;
   contextStopName?: string;
@@ -432,7 +456,9 @@ function BusCard({
   const serverEtaLabel =
     toStopName === tele.nextStopName ? formatServerTelemetryEta(tele) : null;
   const etaLabel =
-    isUsingRecommendedStop && stopEta
+    vehicleStatus !== "fresh"
+      ? "กำลังอัปเดต"
+      : isUsingRecommendedStop && stopEta
       ? formatEtaMinutes(stopEta)
       : serverEtaLabel ?? formatDistanceEta(distanceToStopM, tele.speedKmh);
   const density = getCrowdingDisplay(tele.crowding);
@@ -465,6 +491,11 @@ function BusCard({
             <h3 className="font-heading text-lg font-bold leading-tight tracking-wide text-[var(--color-text)] lg:text-xl">
               {tele.label}
             </h3>
+            {vehicleStatus !== "fresh" && (
+              <div className="mt-1">
+                <StatusBadge status={vehicleStatus} />
+              </div>
+            )}
           </div>
 
           <div className="flex shrink-0 items-center gap-1.5 rounded-full border border-primary/40 bg-primary/10 px-2.5 py-1 lg:px-3 lg:py-1.5">
@@ -698,6 +729,7 @@ function VehicleListContent({
   stopKind,
   onClearStop,
   autoExpandVehicleRequest,
+  liveMode,
   isAlertEnabled,
   isAlertSupported,
   onToggleAlert,
@@ -711,6 +743,7 @@ function VehicleListContent({
   stopKind?: "nearest" | "selected" | null;
   onClearStop?: () => void;
   autoExpandVehicleRequest?: string | null;
+  liveMode?: boolean;
   isAlertEnabled?: boolean;
   isAlertSupported?: boolean;
   onToggleAlert?: () => void;
@@ -745,11 +778,14 @@ function VehicleListContent({
       <div ref={listRef} className="flex-1 space-y-1 overflow-y-auto p-2">
         {!items.length && stop ? (
           <EmptyArrivalState stopName={stop.name_th} />
+        ) : !items.length ? (
+          <EmptyVehicleState liveMode={liveMode} />
         ) : (
           items.map((item) => (
             <div key={item.key} data-vehicle-id={item.vehicleId}>
               <BusCard
                 tele={item.tele}
+                vehicleStatus={item.vehicleStatus}
                 isSelected={selectedVehicleId === item.vehicleId}
                 onSelect={() => onSelectVehicle?.(item.vehicleId)}
                 contextStopName={item.contextStopName}
@@ -774,6 +810,7 @@ function VehicleListContent({
 export function VehiclePanel({
   vehicles,
   telemetry,
+  liveMode,
   onSelectVehicle,
   selectedVehicleId,
   snapLevel,
@@ -812,6 +849,7 @@ export function VehiclePanel({
         return {
           key: vehicle.id,
           vehicleId: vehicle.id,
+          vehicleStatus: vehicle.status,
           tele,
         } satisfies PanelVehicleItem;
       })
@@ -900,6 +938,7 @@ export function VehiclePanel({
   const renderPanelContent = () => (
     <VehicleListContent
       items={items}
+      liveMode={liveMode}
       selectedVehicleId={selectedVehicleId}
       onSelectVehicle={onSelectVehicle}
       stop={stop}

@@ -11,18 +11,38 @@ const HEARTBEAT_INTERVAL_MS = 25_000;
 
 export async function GET() {
   const encoder = new TextEncoder();
+  let closed = false;
+  let heartbeat: ReturnType<typeof setInterval> | null = null;
+  let localSub: Redis | null = null;
+
+  function closeStream() {
+    if (closed) {
+      return;
+    }
+
+    closed = true;
+
+    if (heartbeat) {
+      clearInterval(heartbeat);
+      heartbeat = null;
+    }
+
+    if (localSub) {
+      localSub.unsubscribe().catch(() => null);
+      localSub.quit().catch(() => null);
+      localSub = null;
+    }
+  }
 
   const stream = new ReadableStream({
     async start(controller) {
       // ── Helpers ──────────────────────────────────────────────────────────
-      let closed = false;
-
       function send(data: string) {
         if (closed) return;
         try {
           controller.enqueue(encoder.encode(data));
         } catch {
-          closed = true;
+          closeStream();
         }
       }
 
@@ -42,8 +62,6 @@ export async function GET() {
       // ioredis requires a *dedicated* connection for subscribe mode.
       // We create a per-request duplicate so that the global subscriber
       // connection's channels are never polluted.
-      let localSub: Redis | null = null;
-
       try {
         localSub = redisSubscriber.duplicate();
         // Since lazyConnect: true is enabled in our configuration,
@@ -53,8 +71,7 @@ export async function GET() {
 
         localSub.on("message", (_channel: string, message: string) => {
           if (closed) {
-            localSub?.unsubscribe().catch(() => null);
-            localSub?.quit().catch(() => null);
+            closeStream();
             return;
           }
           try {
@@ -71,23 +88,16 @@ export async function GET() {
       }
 
       // ── 3. Heartbeat to prevent idle timeout ─────────────────────────
-      const heartbeat = setInterval(() => {
+      heartbeat = setInterval(() => {
         if (closed) {
-          clearInterval(heartbeat);
+          closeStream();
           return;
         }
         sendHeartbeat();
       }, HEARTBEAT_INTERVAL_MS);
-
-      // ── 4. Cleanup on client disconnect ───────────────────────────────
-      return () => {
-        closed = true;
-        clearInterval(heartbeat);
-        if (localSub) {
-          localSub.unsubscribe().catch(() => null);
-          localSub.quit().catch(() => null);
-        }
-      };
+    },
+    cancel() {
+      closeStream();
     },
   });
 

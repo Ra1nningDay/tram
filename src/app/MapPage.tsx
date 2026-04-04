@@ -681,6 +681,7 @@ export function MapPage() {
         <VehiclePanel
           vehicles={vehicles}
           telemetry={telemetry}
+          liveMode={dataMode === "live"}
           onSelectVehicle={handleSelectVehicleFromPanel}
           selectedVehicleId={selectedVehicleId}
           snapLevel={panelSnapLevel}

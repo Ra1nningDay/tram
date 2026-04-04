@@ -2,9 +2,33 @@
 
 import { useCallback, useEffect, useRef } from "react";
 import type { Vehicle } from "./api";
+import {
+  BALANCED_BACKGROUND_INTERVAL_MS,
+  BALANCED_IDLE_INTERVAL_MS,
+  BALANCED_MOVING_INTERVAL_MS,
+  BALANCED_MOVING_SPEED_THRESHOLD_MPS,
+  getBalancedTrackingIntervalMs,
+} from "@/lib/vehicles/balanced-profile";
 
-// GPS position reported to the server every REPORT_INTERVAL_MS while on duty
-const REPORT_INTERVAL_MS = 5_000;
+export const GPS_REPORT_INTERVAL_MOVING_MS = BALANCED_MOVING_INTERVAL_MS;
+export const GPS_REPORT_INTERVAL_IDLE_MS = BALANCED_IDLE_INTERVAL_MS;
+export const GPS_REPORT_INTERVAL_BACKGROUND_MS = BALANCED_BACKGROUND_INTERVAL_MS;
+export const GPS_MOVING_SPEED_THRESHOLD_MPS = BALANCED_MOVING_SPEED_THRESHOLD_MPS;
+export const GPS_HEADING_CHANGE_THRESHOLD_DEG = 15;
+
+const FOREGROUND_WATCH_OPTIONS: PositionOptions = {
+  enableHighAccuracy: true,
+  maximumAge: 4_000,
+  timeout: 10_000,
+};
+
+const BACKGROUND_WATCH_OPTIONS: PositionOptions = {
+  enableHighAccuracy: false,
+  maximumAge: 10_000,
+  timeout: 20_000,
+};
+
+export type GpsReporterTrackingMode = "foreground" | "background";
 
 type GpsReporterOptions = {
   /** Whether to actively watch & report GPS. Set to true when driver is on duty. */
@@ -17,7 +41,97 @@ type GpsReporterOptions = {
 
 type ReportResult =
   | { ok: true }
-  | { ok: false; reason: "no-position" | "fetch-error" | "server-error" };
+  | { ok: false; reason: "fetch-error" | "server-error" };
+
+type SendLatestPositionOptions = {
+  force?: boolean;
+};
+
+type ImmediateGpsReportStateChange = {
+  previousVehicleId: string | null;
+  nextVehicleId: string;
+  previousCrowding: Vehicle["crowding"];
+  nextCrowding: Vehicle["crowding"];
+  previousDirection: "outbound" | "inbound";
+  nextDirection: "outbound" | "inbound";
+  hasLatestPosition: boolean;
+  hasSentInitialFix: boolean;
+};
+
+export function getGpsReporterTrackingMode(
+  visibilityState?: DocumentVisibilityState,
+): GpsReporterTrackingMode {
+  return visibilityState === "hidden" ? "background" : "foreground";
+}
+
+export function getGpsReporterIntervalMs(
+  speedMps?: number | null,
+  trackingMode: GpsReporterTrackingMode = "foreground",
+): number {
+  return getBalancedTrackingIntervalMs(speedMps, trackingMode);
+}
+
+export function getGpsReporterWatchOptions(
+  trackingMode: GpsReporterTrackingMode,
+): PositionOptions {
+  return trackingMode === "background"
+    ? BACKGROUND_WATCH_OPTIONS
+    : FOREGROUND_WATCH_OPTIONS;
+}
+
+function normalizeHeading(heading?: number | null): number | null {
+  if (typeof heading !== "number" || !Number.isFinite(heading)) {
+    return null;
+  }
+
+  const normalized = heading % 360;
+  return normalized < 0 ? normalized + 360 : normalized;
+}
+
+export function getHeadingDeltaDeg(
+  previousHeading?: number | null,
+  nextHeading?: number | null,
+): number {
+  const previous = normalizeHeading(previousHeading);
+  const next = normalizeHeading(nextHeading);
+
+  if (previous === null || next === null) {
+    return 0;
+  }
+
+  const delta = Math.abs(next - previous);
+  return Math.min(delta, 360 - delta);
+}
+
+export function hasSignificantHeadingChange(
+  previousHeading?: number | null,
+  nextHeading?: number | null,
+  thresholdDeg: number = GPS_HEADING_CHANGE_THRESHOLD_DEG,
+): boolean {
+  return getHeadingDeltaDeg(previousHeading, nextHeading) > thresholdDeg;
+}
+
+export function shouldForceGpsReportOnStateChange(
+  change: ImmediateGpsReportStateChange,
+): boolean {
+  if (!change.hasLatestPosition) {
+    return false;
+  }
+
+  if (!change.hasSentInitialFix) {
+    return true;
+  }
+
+  const isSameVehicle = change.previousVehicleId === change.nextVehicleId;
+  if (!isSameVehicle) {
+    return false;
+  }
+
+  return (
+    change.previousCrowding !== change.nextCrowding ||
+    change.previousDirection !== change.nextDirection
+  );
+}
 
 export async function finalizeGpsReporterStop(
   pendingReport: Promise<unknown> | null,
@@ -71,7 +185,6 @@ async function reportPosition(
     const res = await fetch("/api/gps/ingest", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      // No Bearer token — auth is handled by the better-auth session cookie
       body: JSON.stringify({
         vehicle_id: vehicleId,
         label: vehicleLabel ?? vehicleId,
@@ -83,7 +196,7 @@ async function reportPosition(
         crowding: opts.crowding ?? "normal",
         session_id: sessionId,
       }),
-      credentials: "include", // send session cookie
+      credentials: "include",
     });
 
     if (!res.ok) return { ok: false, reason: "server-error" };
@@ -97,44 +210,104 @@ async function reportPosition(
  * useGpsReporter
  *
  * Starts watching the device's GPS position and POSTs it to /api/gps/ingest
- * every REPORT_INTERVAL_MS while `enabled` is true.
+ * using the Balanced cadence profile while `enabled` is true:
  *
- * Auth happens automatically via the better-auth session cookie — no extra
- * tokens needed in the driver app.
- *
- * Usage:
- * ```tsx
- * useGpsReporter({
- *   enabled: mode !== "off",   // true when driver taps "เริ่มทำงาน"
- *   vehicleId: selectedVehicle,
- *   direction: "outbound",
- * });
- * ```
+ * - moving (`speed >= 2 m/s`): every 2s
+ * - slow / stopped: every 5s
+ * - background: every 10s best-effort
+ * - immediate flush on duty start/stop, route change, crowding change,
+ *   and heading changes greater than 15 degrees
  */
 export function useGpsReporter(opts: GpsReporterOptions) {
   const latestPositionRef = useRef<GeolocationPosition | null>(null);
   const watchIdRef = useRef<number | null>(null);
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hasSentInitialFixRef = useRef(false);
   const isReportingRef = useRef(false);
   const reportPromiseRef = useRef<Promise<ReportResult> | null>(null);
   const reportSequenceRef = useRef(0);
+  const lastReportAtMsRef = useRef<number | null>(null);
+  const lastReportedPositionTimestampRef = useRef<number | null>(null);
+  const lastReportedHeadingRef = useRef<number | null>(null);
+  const queuedImmediateReportRef = useRef(false);
   const activeVehicleIdRef = useRef<string | null>(null);
   const activeSessionIdRef = useRef<string | null>(null);
   const activeCrowdingRef = useRef<Vehicle["crowding"]>("normal");
+  const activeDirectionRef = useRef<"outbound" | "inbound">("outbound");
   const optsRef = useRef(opts);
+  const scheduleNextReportRef = useRef<() => void>(() => undefined);
 
-  // Keep opts ref current without re-triggering the effect
   useEffect(() => {
     optsRef.current = opts;
-  });
+  }, [opts]);
 
-  const sendLatestPosition = useCallback(() => {
+  const getCurrentTrackingMode = useCallback((): GpsReporterTrackingMode => {
+    return getGpsReporterTrackingMode(
+      typeof document === "undefined" ? "visible" : document.visibilityState,
+    );
+  }, []);
+
+  const clearScheduledReport = useCallback(() => {
+    if (timeoutRef.current !== null) {
+      clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
+    }
+  }, []);
+
+  const resetCadenceState = useCallback(() => {
+    clearScheduledReport();
+    hasSentInitialFixRef.current = false;
+    lastReportAtMsRef.current = null;
+    lastReportedPositionTimestampRef.current = null;
+    lastReportedHeadingRef.current = null;
+    queuedImmediateReportRef.current = false;
+  }, [clearScheduledReport]);
+
+  const sendLatestPosition = useCallback((options?: SendLatestPositionOptions) => {
+    clearScheduledReport();
+
     const pos = latestPositionRef.current;
     const sessionId = activeSessionIdRef.current;
-    if (!pos || isReportingRef.current || !sessionId) return;
+    if (!pos || !sessionId) {
+      return;
+    }
+
+    if (isReportingRef.current) {
+      if (options?.force) {
+        queuedImmediateReportRef.current = true;
+      }
+      return;
+    }
+
+    const isForced = options?.force === true;
+    if (!isForced) {
+      const intervalMs = getGpsReporterIntervalMs(
+        pos.coords.speed,
+        getCurrentTrackingMode(),
+      );
+      const lastReportAtMs = lastReportAtMsRef.current;
+      const hasNewPosition =
+        pos.timestamp !== lastReportedPositionTimestampRef.current;
+
+      if (!hasNewPosition) {
+        scheduleNextReportRef.current();
+        return;
+      }
+
+      if (
+        typeof lastReportAtMs === "number" &&
+        Date.now() - lastReportAtMs < intervalMs
+      ) {
+        scheduleNextReportRef.current();
+        return;
+      }
+    }
 
     isReportingRef.current = true;
+    lastReportAtMsRef.current = Date.now();
+    lastReportedPositionTimestampRef.current = pos.timestamp;
+    lastReportedHeadingRef.current = normalizeHeading(pos.coords.heading);
+
     const reportSequence = ++reportSequenceRef.current;
     const pendingReport = reportPosition(pos, optsRef.current, sessionId);
     reportPromiseRef.current = pendingReport;
@@ -152,58 +325,106 @@ export function useGpsReporter(opts: GpsReporterOptions) {
         if (reportSequenceRef.current === reportSequence) {
           isReportingRef.current = false;
         }
+
+        if (queuedImmediateReportRef.current) {
+          queuedImmediateReportRef.current = false;
+          sendLatestPosition({ force: true });
+          return;
+        }
+
+        scheduleNextReportRef.current();
       });
-  }, []);
+  }, [clearScheduledReport, getCurrentTrackingMode]);
 
-  const stopWatching = useCallback(() => {
-    if (watchIdRef.current !== null) {
-      navigator.geolocation.clearWatch(watchIdRef.current);
-      watchIdRef.current = null;
-    }
-    if (intervalRef.current !== null) {
-      clearInterval(intervalRef.current);
-      intervalRef.current = null;
-    }
-    latestPositionRef.current = null;
-    hasSentInitialFixRef.current = false;
-    isReportingRef.current = reportPromiseRef.current !== null;
-  }, []);
-
-  const startWatching = useCallback(() => {
+  const beginWatch = useCallback(() => {
     if (!("geolocation" in navigator)) {
       console.warn("[useGpsReporter] Geolocation not supported");
       return;
     }
 
     if (watchIdRef.current !== null) {
-      return;
+      navigator.geolocation.clearWatch(watchIdRef.current);
+      watchIdRef.current = null;
     }
 
-    // Continuously update the cached position
     watchIdRef.current = navigator.geolocation.watchPosition(
       (position) => {
         latestPositionRef.current = position;
 
         if (!hasSentInitialFixRef.current) {
           hasSentInitialFixRef.current = true;
-          sendLatestPosition();
+          sendLatestPosition({ force: true });
+          return;
         }
+
+        if (
+          hasSignificantHeadingChange(
+            lastReportedHeadingRef.current,
+            position.coords.heading,
+          )
+        ) {
+          sendLatestPosition({ force: true });
+          return;
+        }
+
+        scheduleNextReportRef.current();
       },
       (err) => {
         console.warn("[useGpsReporter] watchPosition error:", err.message);
       },
-      {
-        enableHighAccuracy: true,
-        maximumAge: 4_000,
-        timeout: 10_000,
-      },
+      getGpsReporterWatchOptions(getCurrentTrackingMode()),
     );
+  }, [getCurrentTrackingMode, sendLatestPosition]);
 
-    // Send the latest cached position to the server on a fixed interval
-    intervalRef.current = setInterval(() => {
+  const scheduleNextReport = useCallback(() => {
+    clearScheduledReport();
+
+    if (!optsRef.current.enabled || isReportingRef.current) {
+      return;
+    }
+
+    const pos = latestPositionRef.current;
+    const sessionId = activeSessionIdRef.current;
+    if (!pos || !sessionId) {
+      return;
+    }
+
+    const intervalMs = getGpsReporterIntervalMs(
+      pos.coords.speed,
+      getCurrentTrackingMode(),
+    );
+    const lastReportAtMs = lastReportAtMsRef.current;
+    const elapsedMs =
+      typeof lastReportAtMs === "number" ? Date.now() - lastReportAtMs : intervalMs;
+    const delayMs = Math.max(0, intervalMs - elapsedMs);
+
+    timeoutRef.current = setTimeout(() => {
+      timeoutRef.current = null;
       sendLatestPosition();
-    }, REPORT_INTERVAL_MS);
-  }, [sendLatestPosition]);
+    }, delayMs);
+  }, [clearScheduledReport, getCurrentTrackingMode, sendLatestPosition]);
+
+  scheduleNextReportRef.current = scheduleNextReport;
+
+  const stopWatching = useCallback(() => {
+    if (watchIdRef.current !== null) {
+      navigator.geolocation.clearWatch(watchIdRef.current);
+      watchIdRef.current = null;
+    }
+
+    latestPositionRef.current = null;
+    resetCadenceState();
+    isReportingRef.current = reportPromiseRef.current !== null;
+  }, [resetCadenceState]);
+
+  const startWatching = useCallback(() => {
+    if (watchIdRef.current !== null) {
+      return;
+    }
+
+    beginWatch();
+    scheduleNextReportRef.current();
+  }, [beginWatch]);
 
   const stopVehicleSession = useCallback((
     vehicleId: string | null,
@@ -221,46 +442,88 @@ export function useGpsReporter(opts: GpsReporterOptions) {
   }, []);
 
   useEffect(() => {
+    if (typeof document === "undefined") {
+      return;
+    }
+
+    const handleVisibilityChange = () => {
+      if (!optsRef.current.enabled) {
+        return;
+      }
+
+      beginWatch();
+      scheduleNextReportRef.current();
+      sendLatestPosition();
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [beginWatch, sendLatestPosition]);
+
+  useEffect(() => {
     const previousVehicleId = activeVehicleIdRef.current;
     const previousSessionId = activeSessionIdRef.current;
     const previousCrowding = activeCrowdingRef.current;
+    const previousDirection = activeDirectionRef.current;
     const pendingReport = reportPromiseRef.current;
+    const nextCrowding = opts.crowding ?? "normal";
+    const nextDirection = opts.direction ?? "outbound";
 
     if (!opts.enabled) {
       stopWatching();
       activeVehicleIdRef.current = null;
       activeSessionIdRef.current = null;
       activeCrowdingRef.current = "normal";
+      activeDirectionRef.current = "outbound";
       stopVehicleSession(previousVehicleId, previousSessionId, pendingReport);
       return;
     }
 
     if (!previousSessionId || previousVehicleId !== opts.vehicleId) {
       activeSessionIdRef.current = createReporterSessionId();
+      resetCadenceState();
     }
 
     activeVehicleIdRef.current = opts.vehicleId;
-    activeCrowdingRef.current = opts.crowding ?? "normal";
+    activeCrowdingRef.current = nextCrowding;
+    activeDirectionRef.current = nextDirection;
     startWatching();
 
     if (previousVehicleId && previousVehicleId !== opts.vehicleId) {
       stopVehicleSession(previousVehicleId, previousSessionId, pendingReport);
-      hasSentInitialFixRef.current = false;
     }
 
-    const crowdingChanged = previousCrowding !== (opts.crowding ?? "normal");
+    const crowdingChanged =
+      previousVehicleId === opts.vehicleId && previousCrowding !== nextCrowding;
+    const directionChanged =
+      previousVehicleId === opts.vehicleId && previousDirection !== nextDirection;
 
     if (
-      latestPositionRef.current &&
-      (!hasSentInitialFixRef.current || crowdingChanged)
+      shouldForceGpsReportOnStateChange({
+        previousVehicleId,
+        nextVehicleId: opts.vehicleId,
+        previousCrowding,
+        nextCrowding,
+        previousDirection,
+        nextDirection,
+        hasLatestPosition: latestPositionRef.current !== null,
+        hasSentInitialFix: hasSentInitialFixRef.current,
+      })
     ) {
       hasSentInitialFixRef.current = true;
-      sendLatestPosition();
+      sendLatestPosition({ force: true });
+      return;
     }
+
+    scheduleNextReportRef.current();
   }, [
     opts.enabled,
     opts.vehicleId,
     opts.crowding,
+    opts.direction,
+    resetCadenceState,
     sendLatestPosition,
     startWatching,
     stopVehicleSession,
@@ -277,6 +540,7 @@ export function useGpsReporter(opts: GpsReporterOptions) {
       activeVehicleIdRef.current = null;
       activeSessionIdRef.current = null;
       activeCrowdingRef.current = "normal";
+      activeDirectionRef.current = "outbound";
       stopVehicleSession(activeVehicleId, activeSessionId, pendingReport);
     };
   }, [stopVehicleSession, stopWatching]);

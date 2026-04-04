@@ -8,6 +8,7 @@ type StreamState = {
   telemetryByVehicleId: Record<string, VehicleTelemetry>;
   serverTime: string | null;
   connected: boolean;
+  hasReceivedSnapshot: boolean;
 };
 
 type SSEPayload = VehicleFeedSnapshot;
@@ -30,6 +31,7 @@ export function useVehicleStream(enabled = true): StreamState {
     telemetryByVehicleId: {},
     serverTime: null,
     connected: false,
+    hasReceivedSnapshot: false,
   });
 
   const esRef = useRef<EventSource | null>(null);
@@ -59,6 +61,7 @@ export function useVehicleStream(enabled = true): StreamState {
           telemetryByVehicleId: payload.telemetryByVehicleId ?? {},
           serverTime: payload.server_time,
           connected: true,
+          hasReceivedSnapshot: true,
         });
       } catch {
         // malformed frame — ignore
@@ -88,7 +91,13 @@ export function useVehicleStream(enabled = true): StreamState {
     return () => {
       esRef.current?.close();
       if (retryTimerRef.current) clearTimeout(retryTimerRef.current);
-      setState((prev) => ({ ...prev, connected: false }));
+      setState({
+        vehicles: [],
+        telemetryByVehicleId: {},
+        serverTime: null,
+        connected: false,
+        hasReceivedSnapshot: false,
+      });
     };
   }, [connect]);
 

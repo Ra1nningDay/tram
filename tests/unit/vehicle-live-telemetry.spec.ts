@@ -4,6 +4,7 @@ import {
   buildLiveVehicleSnapshot,
   buildLiveVehicleTelemetryState,
   buildTelemetryRouteContext,
+  deriveSpeedKph,
 } from "../../src/lib/vehicles/telemetry";
 import type { ShuttleData } from "../../src/lib/data/shuttle-data";
 
@@ -29,6 +30,24 @@ const shuttleData: ShuttleData = {
 };
 
 describe("vehicle live telemetry", () => {
+  it("derives speed from the latest two raw GPS fixes", () => {
+    const derivedSpeedKph = deriveSpeedKph(
+      {
+        latitude: 13.0,
+        longitude: 100.0,
+        receivedAt: new Date("2026-04-04T10:00:00.000Z"),
+      },
+      {
+        latitude: 13.0,
+        longitude: 100.0001,
+        receivedAt: new Date("2026-04-04T10:00:01.000Z"),
+      },
+    );
+
+    expect(derivedSpeedKph).toBeGreaterThan(35);
+    expect(derivedSpeedKph).toBeLessThan(45);
+  });
+
   it("prefers sane device speed and heading when building the live snapshot", () => {
     const snapshot = buildLiveVehicleSnapshot(
       {
@@ -56,6 +75,50 @@ describe("vehicle live telemetry", () => {
       lat: 13,
     });
     expect(snapshot.etaConfidence).toBeGreaterThanOrEqual(0.8);
+  });
+
+  it("smooths along-route speed with EMA before exposing telemetry speed", () => {
+    const routeContext = buildTelemetryRouteContext(shuttleData);
+    const initialTelemetry = buildLiveVehicleTelemetryState(
+      {
+        id: "TRAM-EMA",
+        label: "TRAM-EMA",
+        direction: "outbound",
+        lastUpdated: "2026-04-04T10:00:00.000Z",
+        rawFix: {
+          latitude: 13.0,
+          longitude: 100.0001,
+          speed: 2,
+          receivedAt: new Date("2026-04-04T10:00:00.000Z"),
+        },
+      },
+      routeContext,
+    );
+
+    const smoothedTelemetry = buildLiveVehicleTelemetryState(
+      {
+        id: "TRAM-EMA",
+        label: "TRAM-EMA",
+        direction: "outbound",
+        lastUpdated: "2026-04-04T10:00:01.000Z",
+        rawFix: {
+          latitude: 13.0,
+          longitude: 100.0002,
+          speed: 2,
+          receivedAt: new Date("2026-04-04T10:00:01.000Z"),
+        },
+        previousRawFix: initialTelemetry.rawFix,
+        previousTelemetry: initialTelemetry,
+      },
+      routeContext,
+    );
+
+    expect(smoothedTelemetry.instantaneousAlongRouteSpeedKph).toBeGreaterThan(35);
+    expect(smoothedTelemetry.speedEmaKph).toBeGreaterThan(initialTelemetry.speedEmaKph);
+    expect(smoothedTelemetry.speedEmaKph).toBeLessThan(
+      smoothedTelemetry.instantaneousAlongRouteSpeedKph!,
+    );
+    expect(smoothedTelemetry.snapshot.speedKph).toBe(smoothedTelemetry.speedEmaKph);
   });
 
   it("falls back to server-derived speed and heading when device values are not sane", () => {

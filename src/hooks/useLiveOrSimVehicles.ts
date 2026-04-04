@@ -2,6 +2,11 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import type { Vehicle, VehicleTelemetry } from "../features/shuttle/api";
 import { parseTramCsvFiltered } from "../lib/csv-parser";
 import { deriveVehicleStatus } from "../lib/vehicles/status";
+import {
+    BALANCED_IDLE_INTERVAL_MS,
+    BALANCED_MOVING_INTERVAL_MS,
+    getBalancedExpectedIntervalMs,
+} from "../lib/vehicles/balanced-profile";
 import { useVehicleStream } from "../features/shuttle/useVehicleStream";
 import { shouldUseLiveVehicleFeed, type VehicleDataMode } from "../features/shuttle/live-mode";
 import {
@@ -23,6 +28,11 @@ import {
 const SPEED = 1;
 const MAX_GAP_MS = 10_000;
 const TELEMETRY_THROTTLE_MS = 500;
+export const LIVE_MOVING_EXPECTED_INTERVAL_MS = BALANCED_MOVING_INTERVAL_MS;
+export const LIVE_IDLE_EXPECTED_INTERVAL_MS = BALANCED_IDLE_INTERVAL_MS;
+export const LIVE_FREEZE_AFTER_MULTIPLIER = 1.5;
+
+export type LiveMotionState = "interpolating" | "extrapolating" | "frozen";
 
 /* ------------------------------------------------------------------ */
 /*  Live cursor — tracks each real vehicle between GPS updates         */
@@ -34,6 +44,10 @@ export type LiveCursor = {
     /** Latest raw GPS coordinate from the driver / hardware feed */
     latitude: number;
     longitude: number;
+    /** Smoothed marker start point for the current animation window */
+    interpolationStartLatitude: number;
+    interpolationStartLongitude: number;
+    expectedIntervalMs: number;
     /** Route-projected distance is still used for telemetry such as next stop */
     routeDistanceM: number;
     /** Server-derived or device-reported speed in km/h */
@@ -49,6 +63,83 @@ export type LiveCursor = {
     lastGpsMs: number;
 };
 
+export type VisibleLiveCursor = LiveCursor & {
+    displayLatitude: number;
+    displayLongitude: number;
+    displayStatus: Vehicle["status"];
+    isMotionDelayed: boolean;
+    motionState: LiveMotionState;
+};
+
+export function getExpectedLiveIntervalMs(speedKmh: number): number {
+    return getBalancedExpectedIntervalMs(speedKmh);
+}
+
+function lerp(start: number, end: number, progress: number): number {
+    return start + (end - start) * progress;
+}
+
+export function resolveLiveCursorDisplay(
+    cursor: LiveCursor,
+    nowMs: number,
+): {
+    latitude: number;
+    longitude: number;
+    status: Vehicle["status"];
+    isMotionDelayed: boolean;
+    motionState: LiveMotionState;
+} {
+    const expectedIntervalMs = Math.max(1, cursor.expectedIntervalMs);
+    const elapsedSinceGpsMs = Math.max(0, nowMs - cursor.lastGpsMs);
+    const interpolationProgress = Math.min(elapsedSinceGpsMs / expectedIntervalMs, 1);
+    const deltaLatitude = cursor.latitude - cursor.interpolationStartLatitude;
+    const deltaLongitude = cursor.longitude - cursor.interpolationStartLongitude;
+
+    if (elapsedSinceGpsMs <= expectedIntervalMs) {
+        return {
+            latitude: lerp(
+                cursor.interpolationStartLatitude,
+                cursor.latitude,
+                interpolationProgress,
+            ),
+            longitude: lerp(
+                cursor.interpolationStartLongitude,
+                cursor.longitude,
+                interpolationProgress,
+            ),
+            status: cursor.status,
+            isMotionDelayed: false,
+            motionState: "interpolating",
+        };
+    }
+
+    const freezeAfterMs = expectedIntervalMs * LIVE_FREEZE_AFTER_MULTIPLIER;
+    const extrapolationRatio = Math.min(
+        (elapsedSinceGpsMs - expectedIntervalMs) / expectedIntervalMs,
+        LIVE_FREEZE_AFTER_MULTIPLIER - 1,
+    );
+    const extrapolatedLatitude = cursor.latitude + deltaLatitude * extrapolationRatio;
+    const extrapolatedLongitude = cursor.longitude + deltaLongitude * extrapolationRatio;
+
+    if (elapsedSinceGpsMs <= freezeAfterMs) {
+        return {
+            latitude: extrapolatedLatitude,
+            longitude: extrapolatedLongitude,
+            status: cursor.status,
+            isMotionDelayed: false,
+            motionState: "extrapolating",
+        };
+    }
+
+    return {
+        latitude: extrapolatedLatitude,
+        longitude: extrapolatedLongitude,
+        status: cursor.status === "fresh" ? "delayed" : cursor.status,
+        isMotionDelayed: true,
+        motionState: "frozen",
+    };
+}
+
 export function syncLiveCursors(
     liveCursors: Map<string, LiveCursor>,
     streamVehicles: Vehicle[],
@@ -59,6 +150,9 @@ export function syncLiveCursors(
     for (const v of streamVehicles) {
         activeVehicleIds.add(v.id);
         const existing = liveCursors.get(v.id);
+        const existingDisplay = existing
+            ? resolveLiveCursorDisplay(existing, nowMs)
+            : null;
         const speedKmh =
             typeof v.speedKph === "number"
                 ? v.speedKph
@@ -85,6 +179,9 @@ export function syncLiveCursors(
             label: v.label ?? v.id,
             latitude: v.latitude,
             longitude: v.longitude,
+            interpolationStartLatitude: existingDisplay?.latitude ?? v.latitude,
+            interpolationStartLongitude: existingDisplay?.longitude ?? v.longitude,
+            expectedIntervalMs: getExpectedLiveIntervalMs(speedKmh),
             routeDistanceM,
             speedKmh,
             heading,
@@ -108,9 +205,9 @@ export function syncLiveCursors(
 export function getVisibleLiveCursors(
     liveCursors: Map<string, LiveCursor>,
     nowMs: number,
-): LiveCursor[] {
+): VisibleLiveCursor[] {
     const hiddenIds: string[] = [];
-    const visibleCursors: LiveCursor[] = [];
+    const visibleCursors: VisibleLiveCursor[] = [];
 
     for (const cursor of liveCursors.values()) {
         const status = deriveVehicleStatus(cursor.last_updated, nowMs);
@@ -120,9 +217,22 @@ export function getVisibleLiveCursors(
             continue;
         }
 
+        const display = resolveLiveCursorDisplay(
+            {
+                ...cursor,
+                status,
+            },
+            nowMs,
+        );
+
         visibleCursors.push({
             ...cursor,
             status,
+            displayLatitude: display.latitude,
+            displayLongitude: display.longitude,
+            displayStatus: display.status,
+            isMotionDelayed: display.isMotionDelayed,
+            motionState: display.motionState,
         });
     }
 
@@ -205,31 +315,28 @@ function advanceCursorMut(
 /**
  * useLiveOrSimVehicles
  *
- * Drop-in replacement for `useGpsReplay` that transparently switches
- * between real-time SSE data and the CSV simulation fallback:
+ * Drop-in replacement for `useGpsReplay` that cleanly separates
+ * real-time SSE data from the CSV simulation mode:
  *
- * • **Live mode** (SSE connected + vehicles present):
- *     Uses the latest raw GPS coordinates for map position while still
- *     projecting onto the route polyline for ETA / next-stop telemetry.
+ * • **Live mode**:
+ *     Uses the driver GPS/SSE feed only. When no live vehicles exist yet,
+ *     the map stays empty instead of falling back to simulation.
  *
- * • **Simulation mode** (no live data):
- *     Falls back to the original CSV-replay animation unchanged.
+ * • **Simulation mode**:
+ *     Loads and replays the CSV demo feed unchanged.
  */
 export function useLiveOrSimVehicles(
     initialBearing: number = 0,
     mode: VehicleDataMode = "simulate",
 ): GpsReplayState {
+    const isLiveMode = shouldUseLiveVehicleFeed(mode);
+
     // ── SSE stream ────────────────────────────────────────────────────
     const {
         vehicles: streamVehicles,
         telemetryByVehicleId: streamTelemetryByVehicleId,
-    } = useVehicleStream(mode === "live");
-    const [hasSeenLiveSnapshot, setHasSeenLiveSnapshot] = useState(false);
-    const hasLiveData = shouldUseLiveVehicleFeed(
-        mode,
-        streamVehicles.length,
-        hasSeenLiveSnapshot,
-    );
+        hasReceivedSnapshot,
+    } = useVehicleStream(isLiveMode);
 
     // ── Shared map updater ref (stable across mode switches) ──────────
     const mapUpdaterRef = useRef<MapSourceUpdater | null>(null);
@@ -263,19 +370,18 @@ export function useLiveOrSimVehicles(
     }, [initialBearing]);
 
     useEffect(() => {
-        if (mode !== "live" || streamVehicles.length === 0) {
-            return;
-        }
-
-        setHasSeenLiveSnapshot(true);
-    }, [mode, streamVehicles.length]);
-
-    useEffect(() => {
         streamTelemetryByVehicleIdRef.current = streamTelemetryByVehicleId;
     }, [streamTelemetryByVehicleId]);
 
     // ── Load CSV for simulation fallback ─────────────────────────────
     useEffect(() => {
+        if (isLiveMode || simLoadedRef.current) {
+            if (!isLiveMode && simLoadedRef.current) {
+                setLoading(false);
+            }
+            return;
+        }
+
         let cancelled = false;
 
         async function load() {
@@ -292,7 +398,7 @@ export function useLiveOrSimVehicles(
             simCursorsRef.current = results;
             simLoadedRef.current = true;
             setSimLoaded(true);
-            if (!hasLiveData) {
+            if (!isLiveMode) {
                 setLoading(false);
             }
         }
@@ -301,18 +407,38 @@ export function useLiveOrSimVehicles(
         return () => {
             cancelled = true;
         };
-    }, []);
+    }, [isLiveMode]);
+
+    useEffect(() => {
+        if (!isLiveMode) {
+            setLoading(!simLoadedRef.current);
+            return;
+        }
+
+        if (!hasReceivedSnapshot) {
+            liveCursorsRef.current.clear();
+            setVehicles([]);
+            setTelemetry([]);
+            mapUpdaterRef.current?.({
+                type: "FeatureCollection",
+                features: [],
+            });
+        }
+
+        setLoading(!hasReceivedSnapshot);
+    }, [hasReceivedSnapshot, isLiveMode]);
 
     // ── Snap live GPS positions to route when SSE updates arrive ──────
     useEffect(() => {
-        if (!hasLiveData) return;
+        if (!isLiveMode) return;
 
         const nowMs = Date.now();
         syncLiveCursors(liveCursorsRef.current, streamVehicles, nowMs);
 
-        // Show as loaded immediately once we have live data
-        setLoading(false);
-    }, [streamVehicles, hasLiveData]);
+        if (hasReceivedSnapshot) {
+            setLoading(false);
+        }
+    }, [streamVehicles, hasReceivedSnapshot, isLiveMode]);
 
     // ── Animation tick ────────────────────────────────────────────────
     const tick = useCallback(() => {
@@ -325,18 +451,20 @@ export function useLiveOrSimVehicles(
         const newTelemetry: VehicleTelemetry[] = [];
         const newVehicles: Vehicle[] = [];
 
-        if (hasLiveData) {
+        if (isLiveMode) {
             // ── Live mode ─────────────────────────────────────────────
             for (const cursor of getVisibleLiveCursors(liveCursorsRef.current, nowMs)) {
                 features.push(
                     buildVehicleFeature(
                         cursor.id,
                         cursor.label,
-                        cursor.longitude,
-                        cursor.latitude,
+                        cursor.displayLongitude,
+                        cursor.displayLatitude,
                         cursor.heading,
                     ),
                 );
+                // Keep telemetry on the server-matched route progress, while
+                // the map marker uses the smoothed raw GPS display position.
                 newTelemetry.push(
                     streamTelemetryByVehicleIdRef.current[cursor.id] ??
                     computeTelemetry(
@@ -350,12 +478,12 @@ export function useLiveOrSimVehicles(
                 newVehicles.push({
                     id: cursor.id,
                     label: cursor.label,
-                    latitude: cursor.latitude,
-                    longitude: cursor.longitude,
+                    latitude: cursor.displayLatitude,
+                    longitude: cursor.displayLongitude,
                     heading: cursor.heading,
                     direction: cursor.direction,
                     last_updated: cursor.last_updated,
-                    status: cursor.status,
+                    status: cursor.displayStatus,
                     crowding: cursor.crowding,
                     speedKph: cursor.speedKmh,
                     routeDistanceM: cursor.routeDistanceM,
@@ -401,20 +529,20 @@ export function useLiveOrSimVehicles(
         }
 
         rafRef.current = requestAnimationFrame(tick);
-    }, [hasLiveData]);
+    }, [isLiveMode]);
 
     // ── Start / restart animation when mode or data changes ──────────
     useEffect(() => {
         cancelAnimationFrame(rafRef.current);
 
         // In sim mode, wait until CSV is loaded
-        if (!hasLiveData && !simLoadedRef.current) return;
+        if (!isLiveMode && !simLoadedRef.current) return;
 
         lastFrameRef.current = performance.now();
         rafRef.current = requestAnimationFrame(tick);
 
         return () => cancelAnimationFrame(rafRef.current);
-    }, [hasLiveData, tick, simLoaded]);
+    }, [isLiveMode, tick, simLoaded]);
 
     return {
         vehicles,

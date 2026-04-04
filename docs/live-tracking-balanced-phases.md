@@ -102,14 +102,14 @@ Goal: move from fixed `5s` reporting to adaptive reporting based on vehicle stat
 
 Checklist:
 
-- [ ] Send every `2s` when `speed >= 2 m/s`
-- [ ] Send every `5s` when `speed < 2 m/s`
-- [ ] Send every `10s` best-effort in background
-- [ ] Send immediately on duty start and duty stop
-- [ ] Send immediately on route change
-- [ ] Send immediately on crowding change
-- [ ] Send immediately when heading changes by more than `15deg`
-- [ ] Recover cadence correctly when the app returns from background to foreground
+- [x] Send every `2s` when `speed >= 2 m/s`
+- [x] Send every `5s` when `speed < 2 m/s`
+- [x] Send every `10s` best-effort in background
+- [x] Send immediately on duty start and duty stop
+- [x] Send immediately on route change
+- [x] Send immediately on crowding change
+- [x] Send immediately when heading changes by more than `15deg`
+- [x] Recover cadence correctly when the app returns from background to foreground
 
 Likely touchpoints:
 
@@ -118,7 +118,7 @@ Likely touchpoints:
 
 Exit criteria:
 
-- [ ] Reporter cadence degrades and recovers predictably without breaking session lifecycle
+- [x] Reporter cadence degrades and recovers predictably without breaking session lifecycle
 
 ## Phase 5: Client Motion Smoothing And Delay UX
 
@@ -126,12 +126,12 @@ Goal: make motion feel live without lying about vehicle truth.
 
 Checklist:
 
-- [ ] Interpolate marker from the last point to the new point on every animation frame
-- [ ] Extrapolate for at most one expected interval
-- [ ] Freeze the marker when no update arrives after `1.5x` the expected interval
-- [ ] Downgrade vehicle UI to delayed when the marker is frozen
-- [ ] Make camera follow use the interpolated marker position instead of raw jumps
-- [ ] Keep raw position and matched telemetry responsibilities clearly separated in UI logic
+- [x] Interpolate marker from the last point to the new point on every animation frame
+- [x] Extrapolate for at most one expected interval
+- [x] Freeze the marker when no update arrives after `1.5x` the expected interval
+- [x] Downgrade vehicle UI to delayed when the marker is frozen
+- [x] Make camera follow use the interpolated marker position instead of raw jumps
+- [x] Keep raw position and matched telemetry responsibilities clearly separated in UI logic
 
 Likely touchpoints:
 
@@ -141,7 +141,7 @@ Likely touchpoints:
 
 Exit criteria:
 
-- [ ] Continuous driving looks smooth, stopped vehicles do not jitter, and stale vehicles stop drifting
+- [x] Continuous driving looks smooth, stopped vehicles do not jitter, and stale vehicles stop drifting
 
 ## Phase 6: Hardening, Tests, And Rollout
 
@@ -149,19 +149,19 @@ Goal: lock behavior before adding more sophistication.
 
 Checklist:
 
-- [ ] Add unit tests for derived speed, EMA smoothing, off-route corridor handling, and ETA sorting
-- [ ] Add integration coverage for `/api/gps/ingest`, `/api/vehicles/stream`, and `/api/stops/[id]/etas`
-- [ ] Verify continuous driving: backend receives updates at roughly `2s` cadence and marker motion stays smooth
-- [ ] Verify stop dwell: marker does not jitter at the stop and ETA becomes `0` near the stop
-- [ ] Verify signal loss: `> 60s` delayed, `> 5m` offline, `> 10m` hidden
-- [ ] Verify off-route GPS drift: marker still shows but ETA does not jump to the wrong segment
-- [ ] Verify crowding and driver-state changes update immediately
-- [ ] Verify background to foreground cadence degrade/recover without breaking marker or ETA
-- [ ] Add basic logging or metrics for cadence, stale age, and ETA confidence if needed
+- [x] Add unit tests for derived speed, EMA smoothing, off-route corridor handling, and ETA sorting
+- [x] Add integration coverage for `/api/gps/ingest`, `/api/vehicles/stream`, and `/api/stops/[id]/etas`
+- [x] Verify continuous driving: backend receives updates at roughly `2s` cadence and marker motion stays smooth
+- [x] Verify stop dwell: marker does not jitter at the stop and ETA becomes `0` near the stop
+- [x] Verify signal loss: `> 60s` delayed, `> 5m` offline, `> 10m` hidden
+- [x] Verify off-route GPS drift: marker still shows but ETA does not jump to the wrong segment
+- [x] Verify crowding and driver-state changes update immediately
+- [x] Verify background to foreground cadence degrade/recover without breaking marker or ETA
+- [x] Add basic logging or metrics for cadence, stale age, and ETA confidence if needed
 
 Exit criteria:
 
-- [ ] Balanced live tracking is stable enough for normal shuttle operation without a traffic model or dwell-time model
+- [x] Balanced live tracking is stable enough for normal shuttle operation without a traffic model or dwell-time model
 
 ## Out Of Scope For V1
 
