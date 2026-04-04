@@ -15,8 +15,8 @@ describe("vehicle store", () => {
     delete (globalThis as VehicleStoreGlobal).__vehicleStore;
   });
 
-  it("removes a live vehicle immediately", () => {
-    upsertVehicle({
+  it("removes a live vehicle immediately", async () => {
+    await upsertVehicle({
       id: "TRAM-8",
       label: "TRAM-8",
       latitude: 13.612,
@@ -30,8 +30,8 @@ describe("vehicle store", () => {
     expect(getAllVehicles()).toHaveLength(0);
   });
 
-  it("does not remove a newer vehicle session with a stale stop request", () => {
-    upsertVehicle({
+  it("does not remove a newer vehicle session with a stale stop request", async () => {
+    await upsertVehicle({
       id: "TRAM-8",
       label: "TRAM-8",
       latitude: 13.612,

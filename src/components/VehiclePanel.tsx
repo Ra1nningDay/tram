@@ -2,9 +2,9 @@ import Image from "next/image";
 import { Bell, BellRing, Bus, ChevronDown, ChevronUp, Clock, MapPin, User, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
-import type { Eta, Stop, Vehicle } from "../features/shuttle/api";
+import type { Eta, Stop, Vehicle, VehicleTelemetry } from "../features/shuttle/api";
 import { formatDistance, formatWalkingTime } from "../lib/format-distance";
-import { STOPS_ON_ROUTE, type VehicleTelemetry } from "../hooks/useGpsReplay";
+import { STOPS_ON_ROUTE } from "../hooks/useGpsReplay";
 import { getCrowdingDisplay } from "../lib/vehicles/crowding";
 
 interface VehiclePanelProps {
@@ -55,6 +55,34 @@ function formatEtaMinutes(eta?: Eta): string {
 
   if (eta.eta_minutes < 1) return "< 1 นาที";
   return `~${eta.eta_minutes} นาที`;
+}
+
+function isServerTelemetry(tele: VehicleTelemetry): boolean {
+  return (
+    typeof tele.etaConfidence === "number" ||
+    typeof tele.etaToNextStopS === "number" ||
+    typeof tele.nextStopId === "string"
+  );
+}
+
+function formatServerTelemetryEta(tele: VehicleTelemetry): string | null {
+  if (!isServerTelemetry(tele)) {
+    return null;
+  }
+
+  const confidence = tele.etaConfidence ?? 0;
+  if (typeof tele.etaToNextStopS === "number" && confidence > 0.35) {
+    if (tele.etaToNextStopS <= 30) return "< 1 นาที";
+
+    const minutes = Math.max(1, Math.ceil(tele.etaToNextStopS / 60));
+    return minutes === 1 ? "~1 นาที" : `~${minutes} นาที`;
+  }
+
+  if (tele.speedKmh < 0.5 && confidence > 0.35) {
+    return "รถจอดรับ";
+  }
+
+  return "กำลังอัปเดต";
 }
 
 function getDistanceBetweenStops(
@@ -390,7 +418,8 @@ function BusCard({
   }, [isDropdownOpen]);
 
   const recommendedStopName = contextStopName ?? null;
-  const toStopName = selectedToStop ?? recommendedStopName ?? tele.nextStopName;
+  const toStopName =
+    selectedToStop ?? recommendedStopName ?? tele.nextStopName ?? tele.prevStopName;
   const isUsingRecommendedStop = Boolean(recommendedStopName && selectedToStop === null);
   const distanceToStopM =
     toStopName === tele.nextStopName
@@ -400,10 +429,12 @@ function BusCard({
         toStopName,
         tele.distanceToNextStopM
       );
+  const serverEtaLabel =
+    toStopName === tele.nextStopName ? formatServerTelemetryEta(tele) : null;
   const etaLabel =
     isUsingRecommendedStop && stopEta
       ? formatEtaMinutes(stopEta)
-      : formatDistanceEta(distanceToStopM, tele.speedKmh);
+      : serverEtaLabel ?? formatDistanceEta(distanceToStopM, tele.speedKmh);
   const density = getCrowdingDisplay(tele.crowding);
   const routeLabel = `${tele.prevStopName} >> ${toStopName}`;
   const alertLabel = "แจ้งเตือน";
@@ -762,11 +793,20 @@ export function VehiclePanel({
   const currentSnapLevel = snapLevel ?? internalSnapLevel;
   const mobilePanelHeight =
     currentSnapLevel === 0 ? MOBILE_HEADER_HEIGHT : currentSnapLevel === 1 ? "52vh" : "85vh";
+  const telemetryByVehicleId = useMemo(() => {
+    const next = new Map<string, VehicleTelemetry>();
+
+    for (const item of telemetry) {
+      next.set(item.vehicleId, item);
+    }
+
+    return next;
+  }, [telemetry]);
 
   const items = useMemo<PanelVehicleItem[]>(() => {
     const baseItems = vehicles
-      .map((vehicle, index) => {
-        const tele = telemetry[index];
+      .map((vehicle) => {
+        const tele = telemetryByVehicleId.get(vehicle.id);
         if (!tele) return null;
 
         return {
@@ -844,7 +884,7 @@ export function VehiclePanel({
     }
 
     return resultItems;
-  }, [stop, stopEtas, telemetry, vehicles, selectedVehicleId]);
+  }, [selectedVehicleId, stop, stopEtas, telemetryByVehicleId, vehicles]);
 
   const setSnapLevel = (nextLevel: 0 | 1 | 2) => {
     if (snapLevel === undefined) {

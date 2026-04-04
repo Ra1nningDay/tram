@@ -2,6 +2,7 @@ import { resolveApiUrl } from "../../lib/config";
 
 export type Status = "fresh" | "delayed" | "offline" | "hidden";
 export type VehicleCrowding = "normal" | "full";
+export type MatchedPosition = { lng: number; lat: number };
 
 export type Vehicle = {
   id: string;
@@ -13,6 +14,33 @@ export type Vehicle = {
   last_updated: string;
   status: Status;
   crowding?: VehicleCrowding;
+  speedKph?: number;
+  routeDistanceM?: number;
+  matchedPosition?: MatchedPosition;
+  etaConfidence?: number;
+};
+
+export type VehicleTelemetry = {
+  vehicleId: string;
+  label: string;
+  speedKmh: number;
+  nextStopId?: string;
+  nextStopName?: string;
+  nextStopNameEn?: string;
+  distanceToNextStopM: number;
+  etaToNextStopS?: number;
+  arrivalTime?: string;
+  progressPercent: number;
+  prevStopName: string;
+  status: "normal" | "warning";
+  crowding?: VehicleCrowding;
+  etaConfidence?: number;
+};
+
+export type VehicleFeedSnapshot = {
+  server_time: string;
+  vehicles: Vehicle[];
+  telemetryByVehicleId: Record<string, VehicleTelemetry>;
 };
 
 export type Stop = {
@@ -58,7 +86,7 @@ async function request<T>(path: string): Promise<T> {
 export const api = {
   getRoute: () => request<{ server_time: string; route: Route }>("/api/route"),
   getStops: () => request<{ server_time: string; stops: Stop[] }>("/api/stops"),
-  getVehicles: () => request<{ server_time: string; vehicles: Vehicle[] }>("/api/vehicles"),
+  getVehicles: () => request<VehicleFeedSnapshot>("/api/vehicles"),
   getStopEtas: (stopId: string) =>
     request<{ server_time: string; stop_id: string; etas: Eta[] }>(`/api/stops/${stopId}/etas`),
 };

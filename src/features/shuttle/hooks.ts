@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import type { Route, Stop, Vehicle, Eta } from "./api";
+import type { Route, Stop, VehicleFeedSnapshot, Eta } from "./api";
 
 const REFRESH_MS = 5000; // Fallback polling (SSE is the primary real-time channel)
 
@@ -29,7 +29,7 @@ export function useStops() {
 export function useVehicles() {
   return useQuery({
     queryKey: ["vehicles"],
-    queryFn: () => request<{ server_time: string; vehicles: Vehicle[] }>("/api/vehicles"),
+    queryFn: () => request<VehicleFeedSnapshot>("/api/vehicles"),
     staleTime: 0,
     refetchInterval: REFRESH_MS,
     refetchIntervalInBackground: false,

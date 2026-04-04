@@ -9,7 +9,7 @@ import { Header, type HeaderSearchResult } from "@/components/Header";
 import { VehiclePanel } from "../components/VehiclePanel";
 import campusConfig from "../data/campus-config.json";
 import { getCampusViewport } from "../features/map/campus-viewport";
-import { useRoute, useStops } from "../features/shuttle/hooks";
+import { useRoute, useStopEtas, useStops } from "../features/shuttle/hooks";
 import { useSimulatedInsights } from "../features/shuttle/useSimulatedInsights";
 import { useArrivalAlert } from "../hooks/useArrivalAlert";
 import { useLiveOrSimVehicles } from "../hooks/useLiveOrSimVehicles";
@@ -130,8 +130,17 @@ export function MapPage() {
     vehicles,
     route: routeData?.route,
     stops: allStops,
+    enabled: dataMode !== "live",
   });
-  const selectedStopEtas = selectedStopId ? etasByStopId[selectedStopId] ?? [] : [];
+  const { data: liveStopEtasData } = useStopEtas(
+    dataMode === "live" ? selectedStopId ?? undefined : undefined
+  );
+  const selectedStopEtas =
+    dataMode === "live"
+      ? liveStopEtasData?.etas ?? []
+      : selectedStopId
+        ? etasByStopId[selectedStopId] ?? []
+        : [];
   const activeStopId = selectedStopId ?? nearestStop?.id ?? null;
   const selectedStopDistanceM =
     userLocation && selectedStop

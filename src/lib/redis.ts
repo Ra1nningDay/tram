@@ -1,5 +1,5 @@
 import Redis from "ioredis";
-import type { Vehicle } from "@/features/shuttle/api";
+import type { VehicleFeedSnapshot } from "@/features/shuttle/api";
 import { normalizeLiveVehicleFeed } from "@/lib/vehicles/status";
 
 // ── Channels ────────────────────────────────────────────────────────────────
@@ -72,7 +72,8 @@ export const redisSubscriber = getSubscriber();
 
 export type VehicleUpdatePayload = {
   server_time: string;
-  vehicles: Vehicle[];
+  vehicles: VehicleFeedSnapshot["vehicles"];
+  telemetryByVehicleId: VehicleFeedSnapshot["telemetryByVehicleId"];
 };
 
 function isRedisReady(client: Redis): boolean {
@@ -130,7 +131,7 @@ async function ensureRedisReady(client: Redis): Promise<boolean> {
   });
 }
 
-export async function readVehicleSnapshot(): Promise<Vehicle[] | null> {
+export async function readVehicleSnapshot(): Promise<VehicleFeedSnapshot | null> {
   const isReady = await ensureRedisReady(redisPublisher);
   if (!isReady) {
     return null;
@@ -142,8 +143,22 @@ export async function readVehicleSnapshot(): Promise<Vehicle[] | null> {
       return null;
     }
 
-    const parsed = JSON.parse(raw) as Vehicle[];
-    return Array.isArray(parsed) ? normalizeLiveVehicleFeed(parsed) : null;
+    const parsed = JSON.parse(raw) as VehicleFeedSnapshot;
+    if (!parsed || typeof parsed !== "object" || !Array.isArray(parsed.vehicles)) {
+      return null;
+    }
+
+    return {
+      server_time:
+        typeof parsed.server_time === "string"
+          ? parsed.server_time
+          : new Date().toISOString(),
+      vehicles: normalizeLiveVehicleFeed(parsed.vehicles),
+      telemetryByVehicleId:
+        parsed.telemetryByVehicleId && typeof parsed.telemetryByVehicleId === "object"
+          ? parsed.telemetryByVehicleId
+          : {},
+    };
   } catch {
     return null;
   }
@@ -153,17 +168,18 @@ export async function readVehicleSnapshot(): Promise<Vehicle[] | null> {
  * Publish and persist a vehicle snapshot for all live clients.
  */
 export async function publishVehicleUpdate(
-  vehicles: Vehicle[],
+  snapshot: VehicleFeedSnapshot,
 ): Promise<void> {
   const isReady = await ensureRedisReady(redisPublisher);
   if (!isReady) return;
 
-  const normalizedVehicles = normalizeLiveVehicleFeed(vehicles);
+  const normalizedVehicles = normalizeLiveVehicleFeed(snapshot.vehicles);
   const payload: VehicleUpdatePayload = {
-    server_time: new Date().toISOString(),
+    server_time: snapshot.server_time,
     vehicles: normalizedVehicles,
+    telemetryByVehicleId: snapshot.telemetryByVehicleId,
   };
 
-  await redisPublisher.set(VEHICLE_SNAPSHOT_KEY, JSON.stringify(normalizedVehicles));
+  await redisPublisher.set(VEHICLE_SNAPSHOT_KEY, JSON.stringify(payload));
   await redisPublisher.publish(CHANNEL_VEHICLES, JSON.stringify(payload));
 }

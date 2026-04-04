@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { CHANNEL_VEHICLES, redisSubscriber } from "@/lib/redis";
-import { getLiveVehicleFeed } from "@/lib/vehicles/live";
+import { getLiveVehicleFeedSnapshot } from "@/lib/vehicles/live";
 import type Redis from "ioredis";
 
 export const runtime = "nodejs";
@@ -35,8 +35,8 @@ export async function GET() {
       }
 
       // ── 1. Send current snapshot immediately on connect ───────────────
-      const initial = await getLiveVehicleFeed();
-      sendEvent({ server_time: new Date().toISOString(), vehicles: initial });
+      const initial = await getLiveVehicleFeedSnapshot();
+      sendEvent(initial);
 
       // ── 2. Subscribe to Redis channel ─────────────────────────────────
       // ioredis requires a *dedicated* connection for subscribe mode.

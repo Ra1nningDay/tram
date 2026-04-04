@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import type { Vehicle } from "../features/shuttle/api";
+import type { Vehicle, VehicleTelemetry } from "../features/shuttle/api";
 import { parseTramCsvFiltered } from "../lib/csv-parser";
-import { haversineM } from "../lib/geo/distance";
 import { deriveVehicleStatus } from "../lib/vehicles/status";
 import { useVehicleStream } from "../features/shuttle/useVehicleStream";
 import { shouldUseLiveVehicleFeed, type VehicleDataMode } from "../features/shuttle/live-mode";
@@ -11,9 +10,7 @@ import {
     positionAtDistance,
     computeTelemetry,
     buildVehicleFeature,
-    projectGpsToRoute,
     initCursor,
-    type VehicleTelemetry,
     type GpsReplayState,
     type MapSourceUpdater,
     type TramCursor,
@@ -27,9 +24,6 @@ const SPEED = 1;
 const MAX_GAP_MS = 10_000;
 const TELEMETRY_THROTTLE_MS = 500;
 
-/** Default speed used for dead-reckoning when we have no speed signal */
-const DEFAULT_SPEED_KMH = 20;
-
 /* ------------------------------------------------------------------ */
 /*  Live cursor — tracks each real vehicle between GPS updates         */
 /* ------------------------------------------------------------------ */
@@ -42,9 +36,11 @@ export type LiveCursor = {
     longitude: number;
     /** Route-projected distance is still used for telemetry such as next stop */
     routeDistanceM: number;
-    /** Derived speed in km/h from consecutive GPS snapshots */
+    /** Server-derived or device-reported speed in km/h */
     speedKmh: number;
     heading: number;
+    matchedPosition?: Vehicle["matchedPosition"];
+    etaConfidence?: Vehicle["etaConfidence"];
     crowding?: Vehicle["crowding"];
     direction: Vehicle["direction"];
     status: Vehicle["status"];
@@ -62,46 +58,38 @@ export function syncLiveCursors(
 
     for (const v of streamVehicles) {
         activeVehicleIds.add(v.id);
-        const newRouteDistanceM = projectGpsToRoute(v.latitude, v.longitude);
         const existing = liveCursors.get(v.id);
-
-        let speedKmh = DEFAULT_SPEED_KMH;
-        let heading =
+        const speedKmh =
+            typeof v.speedKph === "number"
+                ? v.speedKph
+                : existing?.speedKmh ?? 0;
+        const heading =
             typeof v.heading === "number"
                 ? normalizeHeading(v.heading)
                 : existing?.heading ?? 0;
-
-        if (existing) {
-            const deltaD = haversineM(
-                [existing.longitude, existing.latitude],
-                [v.longitude, v.latitude],
-            );
-            const deltaT = (nowMs - existing.lastGpsMs) / 1000;
-
-            if (deltaT > 0 && deltaD < 1_000) {
-                speedKmh = Math.min((deltaD / deltaT) * 3.6, 80);
-            } else {
-                speedKmh = existing.speedKmh;
-            }
-
-            if (typeof v.heading !== "number" && deltaD > 0.5) {
-                heading = normalizeHeading(
-                    getHeading(
-                        [existing.longitude, existing.latitude],
-                        [v.longitude, v.latitude],
-                    ),
-                );
-            }
-        }
+        const routeDistanceM =
+            typeof v.routeDistanceM === "number"
+                ? v.routeDistanceM
+                : existing?.routeDistanceM ?? 0;
+        const matchedPosition =
+            v.matchedPosition ??
+            existing?.matchedPosition ??
+            { lng: v.longitude, lat: v.latitude };
+        const etaConfidence =
+            typeof v.etaConfidence === "number"
+                ? v.etaConfidence
+                : existing?.etaConfidence;
 
         liveCursors.set(v.id, {
             id: v.id,
             label: v.label ?? v.id,
             latitude: v.latitude,
             longitude: v.longitude,
-            routeDistanceM: newRouteDistanceM,
+            routeDistanceM,
             speedKmh,
             heading,
+            matchedPosition,
+            etaConfidence,
             crowding: v.crowding,
             direction: v.direction,
             status: v.status,
@@ -148,12 +136,6 @@ export function getVisibleLiveCursors(
 function normalizeHeading(headingDeg: number): number {
     const heading = headingDeg % 360;
     return heading < 0 ? heading + 360 : heading;
-}
-
-function getHeading(from: [number, number], to: [number, number]): number {
-    const dx = to[0] - from[0];
-    const dy = to[1] - from[1];
-    return (Math.atan2(dx, dy) * 180) / Math.PI;
 }
 
 /* ------------------------------------------------------------------ */
@@ -238,7 +220,10 @@ export function useLiveOrSimVehicles(
     mode: VehicleDataMode = "simulate",
 ): GpsReplayState {
     // ── SSE stream ────────────────────────────────────────────────────
-    const { vehicles: streamVehicles } = useVehicleStream(mode === "live");
+    const {
+        vehicles: streamVehicles,
+        telemetryByVehicleId: streamTelemetryByVehicleId,
+    } = useVehicleStream(mode === "live");
     const [hasSeenLiveSnapshot, setHasSeenLiveSnapshot] = useState(false);
     const hasLiveData = shouldUseLiveVehicleFeed(
         mode,
@@ -265,6 +250,7 @@ export function useLiveOrSimVehicles(
 
     // ── Live cursor map ───────────────────────────────────────────────
     const liveCursorsRef = useRef<Map<string, LiveCursor>>(new Map());
+    const streamTelemetryByVehicleIdRef = useRef<Record<string, VehicleTelemetry>>({});
 
     // ── Animation refs ────────────────────────────────────────────────
     const rafRef = useRef<number>(0);
@@ -283,6 +269,10 @@ export function useLiveOrSimVehicles(
 
         setHasSeenLiveSnapshot(true);
     }, [mode, streamVehicles.length]);
+
+    useEffect(() => {
+        streamTelemetryByVehicleIdRef.current = streamTelemetryByVehicleId;
+    }, [streamTelemetryByVehicleId]);
 
     // ── Load CSV for simulation fallback ─────────────────────────────
     useEffect(() => {
@@ -348,6 +338,7 @@ export function useLiveOrSimVehicles(
                     ),
                 );
                 newTelemetry.push(
+                    streamTelemetryByVehicleIdRef.current[cursor.id] ??
                     computeTelemetry(
                         cursor.id,
                         cursor.label,
@@ -366,6 +357,10 @@ export function useLiveOrSimVehicles(
                     last_updated: cursor.last_updated,
                     status: cursor.status,
                     crowding: cursor.crowding,
+                    speedKph: cursor.speedKmh,
+                    routeDistanceM: cursor.routeDistanceM,
+                    matchedPosition: cursor.matchedPosition,
+                    etaConfidence: cursor.etaConfidence,
                 });
             }
         } else {

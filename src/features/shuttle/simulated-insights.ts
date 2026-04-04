@@ -91,6 +91,10 @@ function pickStopsByDirection(stops?: Stop[]): { outbound: Stop[]; inbound: Stop
 }
 
 function getVehicleLngLat(v: Vehicle): LngLat {
+  if (v.matchedPosition) {
+    return [v.matchedPosition.lng, v.matchedPosition.lat];
+  }
+
   return [v.longitude, v.latitude];
 }
 
@@ -138,15 +142,18 @@ export function buildSimulatedInsights(params: SimulatedInsightsParams): Simulat
 
     const nowLngLat = getVehicleLngLat(vehicle);
 
-    // Speed estimation (EMA).
     const prev = prevByVehicleId.get(vehicle.id);
-    let speedMpsEma = prev?.speedMpsEma;
+    const serverSpeedMps =
+      typeof vehicle.speedKph === "number" ? vehicle.speedKph / 3.6 : undefined;
+    let speedMpsEma = serverSpeedMps ?? prev?.speedMpsEma;
 
     // Position along the route.
-    const vProj = projectPointToPolyline(coords, nowLngLat);
-    const vAlong = alongM(measure, vProj);
+    const vAlong =
+      typeof vehicle.routeDistanceM === "number"
+        ? ((vehicle.routeDistanceM % total) + total) % total
+        : alongM(measure, projectPointToPolyline(coords, nowLngLat));
 
-    if (prev) {
+    if (typeof serverSpeedMps !== "number" && prev) {
       const dt = Math.max(0, (nowMs - prev.atMs) / 1000);
       if (dt > 0) {
         const prevProj = projectPointToPolyline(coords, prev.lngLat);
@@ -158,7 +165,12 @@ export function buildSimulatedInsights(params: SimulatedInsightsParams): Simulat
       }
     }
     prevByVehicleId.set(vehicle.id, { lngLat: nowLngLat, atMs: nowMs, speedMpsEma });
-    const speedKph = typeof speedMpsEma === "number" ? speedMpsEma * 3.6 : undefined;
+    const speedKph =
+      typeof serverSpeedMps === "number"
+        ? serverSpeedMps * 3.6
+        : typeof speedMpsEma === "number"
+          ? speedMpsEma * 3.6
+          : undefined;
 
     // Find next stop (min forward distance).
     let nextStop: Stop | undefined;

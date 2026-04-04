@@ -18,6 +18,10 @@ function createVehicle(id: string, lastUpdated: string): Vehicle {
     last_updated: lastUpdated,
     status: "fresh",
     crowding: "normal",
+    speedKph: 18,
+    routeDistanceM: 100,
+    matchedPosition: { lng: 100.837, lat: 13.612 },
+    etaConfidence: 0.92,
   };
 }
 
@@ -75,5 +79,7 @@ describe("live cursor reconciliation", () => {
     );
 
     expect(cursors.get("TRAM-8")?.last_updated).toBe(new Date(nowMs).toISOString());
+    expect(cursors.get("TRAM-8")?.speedKmh).toBe(18);
+    expect(cursors.get("TRAM-8")?.routeDistanceM).toBe(100);
   });
 });
