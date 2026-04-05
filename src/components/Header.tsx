@@ -177,7 +177,7 @@ export function Header({
                         onToggleDataMode();
                         setSettingsOpen(false);
                       }}
-                      className="flex w-full items-center justify-between gap-2 rounded-full bg-surface-lighter/90 px-4 py-2 text-sm font-medium text-white shadow-lg backdrop-blur-md transition-colors hover:bg-surface-light border border-white/10"
+                      className="flex w-full items-center justify-between gap-2 rounded-full border border-[var(--glass-border)] bg-surface-lighter/90 px-4 py-2 text-sm font-medium text-[var(--color-text)] shadow-lg backdrop-blur-md transition-colors hover:bg-surface-light"
                     >
                       <span className="flex items-center gap-2">
                         <span
