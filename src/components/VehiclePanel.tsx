@@ -1,12 +1,18 @@
 import Image from "next/image";
 import { Bell, BellRing, Bus, ChevronDown, ChevronUp, Clock, MapPin, User, X } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 
 import type { Eta, Stop, Vehicle, VehicleTelemetry } from "../features/shuttle/api";
 import { StatusBadge } from "./StatusBadge";
-import { formatDistance, formatWalkingTime } from "../lib/format-distance";
 import { STOPS_ON_ROUTE } from "../hooks/useGpsReplay";
 import { getCrowdingDisplay } from "../lib/vehicles/crowding";
+import {
+  getMobilePanelHeight,
+  getVehicleIdFromAutoExpandRequest,
+  MOBILE_HEADER_HEIGHT,
+  promoteVehiclePanelItems,
+  type PanelHeightMode,
+} from "./vehicle-panel-state";
 
 interface VehiclePanelProps {
   vehicles: Vehicle[];
@@ -14,12 +20,12 @@ interface VehiclePanelProps {
   liveMode?: boolean;
   onSelectVehicle?: (id: string | null) => void;
   selectedVehicleId?: string | null;
+  promotedVehicleId?: string | null;
   snapLevel?: 0 | 1 | 2;
   onSnapLevelChange?: (level: 0 | 1 | 2) => void;
   autoExpandVehicleRequest?: string | null;
   stop?: Stop | null;
   stopEtas?: Eta[];
-  stopDistanceM?: number;
   stopKind?: "nearest" | "selected" | null;
   onClearStop?: () => void;
   isAlertEnabled?: boolean;
@@ -114,7 +120,6 @@ type PanelTheme = {
   handleChevron: string;
 };
 
-const MOBILE_HEADER_HEIGHT = 126;
 const DESKTOP_HEADER_HEIGHT = 110;
 
 function getPanelTheme(date = new Date()): PanelTheme {
@@ -145,11 +150,13 @@ function IllustratedPanelHeader({
   mobile = false,
   snapLevel,
   onToggle,
+  onPointerDown,
 }: {
   theme: PanelTheme;
   mobile?: boolean;
   snapLevel?: 0 | 1 | 2;
   onToggle?: () => void;
+  onPointerDown?: (event: ReactPointerEvent<HTMLDivElement>) => void;
 }) {
   const headerHeight = mobile ? MOBILE_HEADER_HEIGHT : DESKTOP_HEADER_HEIGHT;
   const ChevronIcon = snapLevel === 2 ? ChevronDown : ChevronUp;
@@ -216,13 +223,14 @@ function IllustratedPanelHeader({
         role="button"
         tabIndex={0}
         onClick={onToggle}
+        onPointerDown={onPointerDown}
         onKeyDown={(event) => {
           if (event.key === "Enter" || event.key === " ") {
             event.preventDefault();
             onToggle?.();
           }
         }}
-        className="absolute inset-x-0 top-0 z-30 w-full overflow-hidden rounded-t-[28px] text-left transition-[filter] duration-200 active:brightness-95"
+        className="absolute inset-x-0 top-0 z-30 w-full touch-none overflow-hidden rounded-t-[28px] text-left transition-[filter] duration-200 active:brightness-95"
         style={{ height: headerHeight }}
         aria-label={snapLevel === 2 ? "ย่อแผงข้อมูลรถ" : "ขยายแผงข้อมูลรถ"}
       >
@@ -262,23 +270,17 @@ function DensityBars({ level, color }: { level: number; color: string }) {
 function StopContextHeader({
   stop,
   stopEtas,
-  stopDistanceM,
   stopKind,
   onClearStop,
 }: {
   stop: Stop;
   stopEtas: Eta[];
-  stopDistanceM?: number;
   stopKind?: "nearest" | "selected" | null;
   onClearStop?: () => void;
 }) {
   const title = stop.name_th;
   const kindLabel = stopKind === "nearest" ? "ป้ายใกล้คุณ" : "ป้ายที่เลือก";
   const vehicleCountLabel = `รถกำลังมาถึง ${stopEtas.length} คัน`;
-  const distanceLabel =
-    typeof stopDistanceM === "number"
-      ? `${formatDistance(stopDistanceM)} | ${formatWalkingTime(stopDistanceM)}`
-      : null;
 
   return (
     <div className="relative z-10 overflow-hidden border-b border-[var(--glass-border)]/80 px-4 pb-3 pt-3">
@@ -324,16 +326,6 @@ function StopContextHeader({
               <Bus size={13} className="text-primary" />
               <span>{vehicleCountLabel}</span>
             </div>
-
-            {distanceLabel && (
-              <>
-                <span className="hidden text-[var(--glass-border)] sm:inline">/</span>
-                <div className="inline-flex items-center gap-2 text-[var(--color-text-muted)]">
-                  <MapPin size={13} className="text-accent-light" />
-                  <span>{distanceLabel}</span>
-                </div>
-              </>
-            )}
           </div>
         </div>
       </div>
@@ -725,7 +717,6 @@ function VehicleListContent({
   onSelectVehicle,
   stop,
   stopEtas,
-  stopDistanceM,
   stopKind,
   onClearStop,
   autoExpandVehicleRequest,
@@ -739,7 +730,6 @@ function VehicleListContent({
   onSelectVehicle?: (id: string | null) => void;
   stop?: Stop | null;
   stopEtas: Eta[];
-  stopDistanceM?: number;
   stopKind?: "nearest" | "selected" | null;
   onClearStop?: () => void;
   autoExpandVehicleRequest?: string | null;
@@ -751,17 +741,18 @@ function VehicleListContent({
   const listRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    if (!selectedVehicleId || !listRef.current) return;
+    const targetVehicleId = getVehicleIdFromAutoExpandRequest(autoExpandVehicleRequest);
+    if (!targetVehicleId || !listRef.current) return;
 
     setTimeout(() => {
       if (!listRef.current) return;
       const target = listRef.current.querySelector<HTMLElement>(
-        `[data-vehicle-id="${selectedVehicleId}"]`
+        `[data-vehicle-id="${targetVehicleId}"]`
       );
 
       target?.scrollIntoView({ block: "start", behavior: "smooth" });
     }, 100);
-  }, [selectedVehicleId]);
+  }, [autoExpandVehicleRequest]);
 
   return (
     <div className="relative z-10 flex flex-1 flex-col overflow-hidden">
@@ -769,7 +760,6 @@ function VehicleListContent({
         <StopContextHeader
           stop={stop}
           stopEtas={stopEtas}
-          stopDistanceM={stopDistanceM}
           stopKind={stopKind}
           onClearStop={onClearStop}
         />
@@ -813,12 +803,12 @@ export function VehiclePanel({
   liveMode,
   onSelectVehicle,
   selectedVehicleId,
+  promotedVehicleId,
   snapLevel,
   onSnapLevelChange,
   autoExpandVehicleRequest,
   stop,
   stopEtas = [],
-  stopDistanceM,
   stopKind,
   onClearStop,
   isAlertEnabled,
@@ -826,10 +816,37 @@ export function VehiclePanel({
   onToggleAlert,
 }: VehiclePanelProps) {
   const [internalSnapLevel, setInternalSnapLevel] = useState<0 | 1 | 2>(1);
+  const [panelHeightMode, setPanelHeightMode] = useState<PanelHeightMode>("snap");
+  const [freePanelHeightPx, setFreePanelHeightPx] = useState<number | null>(null);
+  const [isDraggingPanel, setIsDraggingPanel] = useState(false);
   const panelTheme = useMemo(() => getPanelTheme(), []);
   const currentSnapLevel = snapLevel ?? internalSnapLevel;
-  const mobilePanelHeight =
-    currentSnapLevel === 0 ? MOBILE_HEADER_HEIGHT : currentSnapLevel === 1 ? "52vh" : "85vh";
+  const viewportHeightPx =
+    typeof window !== "undefined" ? window.innerHeight : undefined;
+  const mobilePanelHeight = getMobilePanelHeight({
+    snapLevel: currentSnapLevel,
+    panelHeightMode,
+    freePanelHeightPx,
+    viewportHeightPx,
+  });
+  const isMobilePanelContentVisible =
+    panelHeightMode === "free"
+      ? typeof mobilePanelHeight === "number"
+        ? mobilePanelHeight > MOBILE_HEADER_HEIGHT + 8
+        : true
+      : currentSnapLevel > 0;
+  const mobileDragStateRef = useRef<{
+    startY: number;
+    startHeightPx: number;
+    moved: boolean;
+  } | null>(null);
+  const suppressToggleAfterDragRef = useRef(false);
+  const activePanelContextKey = stop?.id
+    ? `stop:${stop.id}`
+    : selectedVehicleId
+      ? `vehicle:${selectedVehicleId}`
+      : "none";
+  const previousPanelContextKeyRef = useRef(activePanelContextKey);
   const telemetryByVehicleId = useMemo(() => {
     const next = new Map<string, VehicleTelemetry>();
 
@@ -907,24 +924,11 @@ export function VehiclePanel({
       }
     }
 
-    if (selectedVehicleId) {
-      const selectedIndex = resultItems.findIndex(
-        (item) => item.vehicleId === selectedVehicleId
-      );
-      if (selectedIndex > 0) {
-        const item = resultItems[selectedIndex];
-        resultItems = [
-          item,
-          ...resultItems.slice(0, selectedIndex),
-          ...resultItems.slice(selectedIndex + 1),
-        ];
-      }
-    }
-
-    return resultItems;
-  }, [selectedVehicleId, stop, stopEtas, telemetryByVehicleId, vehicles]);
+    return promoteVehiclePanelItems(resultItems, promotedVehicleId);
+  }, [promotedVehicleId, stop, stopEtas, telemetryByVehicleId, vehicles]);
 
   const setSnapLevel = (nextLevel: 0 | 1 | 2) => {
+    setPanelHeightMode("snap");
     if (snapLevel === undefined) {
       setInternalSnapLevel(nextLevel);
     }
@@ -932,7 +936,92 @@ export function VehiclePanel({
   };
 
   const handleToggle = () => {
+    if (suppressToggleAfterDragRef.current) {
+      suppressToggleAfterDragRef.current = false;
+      return;
+    }
+
     setSnapLevel(((currentSnapLevel + 1) % 3) as 0 | 1 | 2);
+  };
+
+  useEffect(() => {
+    if (
+      activePanelContextKey !== "none" &&
+      activePanelContextKey !== previousPanelContextKeyRef.current
+    ) {
+      setPanelHeightMode("snap");
+    }
+
+    previousPanelContextKeyRef.current = activePanelContextKey;
+  }, [activePanelContextKey]);
+
+  useEffect(() => {
+    if (!isDraggingPanel || typeof window === "undefined") {
+      return;
+    }
+
+    const handlePointerMove = (event: PointerEvent) => {
+      const currentDragState = mobileDragStateRef.current;
+      if (!currentDragState) {
+        return;
+      }
+
+      const deltaY = event.clientY - currentDragState.startY;
+      const nextHeightPx = currentDragState.startHeightPx - deltaY;
+
+      if (Math.abs(deltaY) > 6) {
+        currentDragState.moved = true;
+        suppressToggleAfterDragRef.current = true;
+        setPanelHeightMode("free");
+        setFreePanelHeightPx(nextHeightPx);
+      }
+    };
+
+    const handlePointerUp = () => {
+      setIsDraggingPanel(false);
+      mobileDragStateRef.current = null;
+    };
+
+    window.addEventListener("pointermove", handlePointerMove);
+    window.addEventListener("pointerup", handlePointerUp);
+    window.addEventListener("pointercancel", handlePointerUp);
+
+    return () => {
+      window.removeEventListener("pointermove", handlePointerMove);
+      window.removeEventListener("pointerup", handlePointerUp);
+      window.removeEventListener("pointercancel", handlePointerUp);
+    };
+  }, [isDraggingPanel]);
+
+  const handleMobileHeaderPointerDown = (
+    event: ReactPointerEvent<HTMLDivElement>
+  ) => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    if (event.pointerType === "mouse" && event.button !== 0) {
+      return;
+    }
+
+    const snapHeightPx =
+      currentSnapLevel === 0
+        ? MOBILE_HEADER_HEIGHT
+        : currentSnapLevel === 1
+          ? window.innerHeight * 0.52
+          : window.innerHeight * 0.85;
+    const startHeightPx =
+      panelHeightMode === "free" && typeof freePanelHeightPx === "number"
+        ? freePanelHeightPx
+        : snapHeightPx;
+
+    mobileDragStateRef.current = {
+      startY: event.clientY,
+      startHeightPx,
+      moved: false,
+    };
+    suppressToggleAfterDragRef.current = false;
+    setIsDraggingPanel(true);
   };
 
   const renderPanelContent = () => (
@@ -943,7 +1032,6 @@ export function VehiclePanel({
       onSelectVehicle={onSelectVehicle}
       stop={stop}
       stopEtas={stopEtas}
-      stopDistanceM={stopDistanceM}
       stopKind={stopKind}
       onClearStop={onClearStop}
       autoExpandVehicleRequest={autoExpandVehicleRequest}
@@ -964,7 +1052,7 @@ export function VehiclePanel({
 
       <div className="fixed bottom-0 left-0 right-0 z-20 flex h-[90vh] flex-col justify-end pointer-events-none md:hidden">
         <div
-          className="glass-card-dark relative pointer-events-auto flex w-full flex-col overflow-hidden rounded-t-[28px] rounded-b-none border-t border-[var(--panel-border)] bg-[var(--glass-strong-bg)] shadow-[0_-8px_30px_rgba(0,0,0,0.5)] backdrop-blur-xl transition-all duration-300 ease-spring"
+          className={`glass-card-dark relative pointer-events-auto flex w-full flex-col overflow-hidden rounded-t-[28px] rounded-b-none border-t border-[var(--panel-border)] bg-[var(--glass-strong-bg)] shadow-[0_-8px_30px_rgba(0,0,0,0.5)] backdrop-blur-xl ${isDraggingPanel ? "transition-none" : "transition-all duration-300 ease-spring"}`}
           style={{ height: mobilePanelHeight }}
         >
           <IllustratedPanelHeader
@@ -972,10 +1060,11 @@ export function VehiclePanel({
             mobile
             snapLevel={currentSnapLevel}
             onToggle={handleToggle}
+            onPointerDown={handleMobileHeaderPointerDown}
           />
 
           <div
-            className={`flex flex-col min-h-0 flex-1 transition-opacity duration-300 ${currentSnapLevel > 0 ? "opacity-100" : "pointer-events-none opacity-0"
+            className={`flex flex-col min-h-0 flex-1 transition-opacity duration-300 ${isMobilePanelContentVisible ? "opacity-100" : "pointer-events-none opacity-0"
               }`}
             style={{ marginTop: MOBILE_HEADER_HEIGHT }}
           >

@@ -8,7 +8,6 @@ import { Header, type HeaderSearchResult } from "@/components/Header";
 
 import { VehiclePanel } from "../components/VehiclePanel";
 import campusConfig from "../data/campus-config.json";
-import { getCampusViewport } from "../features/map/campus-viewport";
 import { useRoute, useStopEtas, useStops } from "../features/shuttle/hooks";
 import { useSimulatedInsights } from "../features/shuttle/useSimulatedInsights";
 import { useArrivalAlert } from "../hooks/useArrivalAlert";
@@ -17,6 +16,17 @@ import { useNearestStop } from "../hooks/useNearestStop";
 import { useUserLocation } from "../hooks/useUserLocation";
 import { haversineM } from "../lib/geo/distance";
 import type { VehicleDataMode } from "../features/shuttle/live-mode";
+import {
+  clearStopFocus,
+  clearVehicleFocusFromBlankMap,
+  INITIAL_MAP_FOCUS_STATE,
+  selectStop,
+  selectVehicleFromMap,
+  selectVehicleFromPanel,
+  selectVehicleFromSearch,
+  shouldAutoFocusVehicleSelection,
+  type MapFocusState,
+} from "../features/map/focus-state";
 
 const ALERT_STORAGE_KEY = "map-arrival-alerts-enabled";
 const STOP_PROXIMITY_VIBRATION_DISTANCE_M = 20;
@@ -104,8 +114,7 @@ export function MapPage() {
   } = useUserLocation();
   const { nearestStop } = useNearestStop(userLocation, allStops);
 
-  const [selectedVehicleId, setSelectedVehicleId] = useState<string | null>(null);
-  const [selectedStopId, setSelectedStopId] = useState<string | null>(null);
+  const [focusState, setFocusState] = useState<MapFocusState>(INITIAL_MAP_FOCUS_STATE);
   const [isAlertEnabled, setIsAlertEnabled] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -121,6 +130,12 @@ export function MapPage() {
   const userManuallySelectedRef = useRef(false);
   const proximityStopIdRef = useRef<string | null>(null);
   const hasEnteredProximityRef = useRef(false);
+  const {
+    selectedVehicleId,
+    selectedStopId,
+    selectionOrigin,
+    promotedVehicleId,
+  } = focusState;
   selectedVehicleIdRef.current = selectedVehicleId;
 
   const selectedStop = selectedStopId
@@ -142,13 +157,6 @@ export function MapPage() {
         ? etasByStopId[selectedStopId] ?? []
         : [];
   const activeStopId = selectedStopId ?? nearestStop?.id ?? null;
-  const selectedStopDistanceM =
-    userLocation && selectedStop
-      ? haversineM(
-        [userLocation.longitude, userLocation.latitude],
-        [selectedStop.longitude, selectedStop.latitude]
-      )
-      : undefined;
   const proximityStop = selectedStop ?? nearestStop;
   const proximityStopDistanceM =
     userLocation && proximityStop
@@ -295,7 +303,7 @@ export function MapPage() {
   }, [setMapUpdater]);
 
   useEffect(() => {
-    if (!selectedVehicleId) {
+    if (!selectedVehicleId || !shouldAutoFocusVehicleSelection(selectionOrigin)) {
       selectedVehicleCoordsRef.current = null;
       followLastTsRef.current = null;
       if (followRafRef.current !== null) {
@@ -349,7 +357,7 @@ export function MapPage() {
       }
       followLastTsRef.current = null;
     };
-  }, [selectedVehicleId]);
+  }, [selectedVehicleId, selectionOrigin]);
 
   useEffect(() => {
     try {
@@ -376,6 +384,10 @@ export function MapPage() {
     if (!map) return;
 
     if (selectedVehicleId) {
+      if (!shouldAutoFocusVehicleSelection(selectionOrigin)) {
+        return;
+      }
+
       const vehicle = vehicles.find((item) => item.id === selectedVehicleId);
       const targetCenter =
         selectedVehicleCoordsRef.current ??
@@ -395,64 +407,33 @@ export function MapPage() {
       return;
     }
 
-    if (selectedStopId) {
-      return;
-    }
-
-    isFlyingRef.current = true;
-    const { campusCenter } = getCampusViewport(
-      campusConfig.polygon as [number, number][],
-      { isMobile }
-    );
-    map.flyTo({
-      center: campusCenter,
-      zoom: campusConfig.initialZoom,
-      duration: 800,
-    });
-    map.once("moveend", () => {
-      isFlyingRef.current = false;
-    });
-  }, [isMobile, selectedStopId, selectedVehicleId]);
-
-  const handleSelectVehicle = useCallback((
-    id: string | null,
-    options?: { panelSnapLevel?: PanelSnapLevel }
-  ) => {
-    setAutoExpandVehicleRequest(null);
-
-    const nextVehicleId =
-      id === null ? null : selectedVehicleId === id ? null : id;
-
-    if (nextVehicleId !== null) {
-      userManuallySelectedRef.current = true;
-      setSelectedStopId(null);
-      if (options?.panelSnapLevel !== undefined) {
-        setPanelSnapLevel(options.panelSnapLevel);
-      }
-    }
-
-    setSelectedVehicleId(nextVehicleId);
-  }, [selectedVehicleId]);
-
-  const handleClearSelection = useCallback(() => {
-    setSelectedVehicleId(null);
-    setSelectedStopId(null);
-    setAutoExpandVehicleRequest(null);
-    setPanelSnapLevel(0);
-    userManuallySelectedRef.current = false;
-  }, []);
+  }, [selectionOrigin, selectedStopId, selectedVehicleId, vehicles]);
 
   const handleSelectVehicleFromMap = useCallback((id: string | null) => {
     if (id === null) {
-      handleClearSelection();
+      if (!selectedVehicleId) {
+        return;
+      }
+
+      setAutoExpandVehicleRequest(null);
+      setFocusState((current) => clearVehicleFocusFromBlankMap(current));
+      userManuallySelectedRef.current = false;
     } else {
-      handleSelectVehicle(id, { panelSnapLevel: 1 });
+      userManuallySelectedRef.current = true;
+      setFocusState((current) => selectVehicleFromMap(current, id));
+      setPanelSnapLevel(1);
     }
-  }, [handleSelectVehicle, handleClearSelection]);
+  }, [selectedVehicleId]);
 
   const handleSelectVehicleFromPanel = useCallback((id: string | null) => {
-    handleSelectVehicle(id);
-  }, [handleSelectVehicle]);
+    if (id === null) {
+      return;
+    }
+
+    setAutoExpandVehicleRequest(null);
+    userManuallySelectedRef.current = true;
+    setFocusState((current) => selectVehicleFromPanel(current, id));
+  }, []);
 
   const flyToStop = useCallback((stopId: string) => {
     const stop = allStops?.find((item) => item.id === stopId);
@@ -472,8 +453,9 @@ export function MapPage() {
   const handleSelectStop = useCallback(
     (stopId: string) => {
       const nextStopId = selectedStopId === stopId ? null : stopId;
-      setSelectedStopId(nextStopId);
-      setSelectedVehicleId(null);
+      setFocusState((current) =>
+        nextStopId === null ? INITIAL_MAP_FOCUS_STATE : selectStop(current, stopId)
+      );
       setAutoExpandVehicleRequest(null);
       userManuallySelectedRef.current = true;
       
@@ -481,30 +463,36 @@ export function MapPage() {
         setPanelSnapLevel(1);
       }
       
-      flyToStop(stopId);
+      if (nextStopId !== null) {
+        flyToStop(stopId);
+      }
     },
     [flyToStop, selectedStopId]
   );
 
   const focusStopFromSearch = useCallback((stopId: string) => {
     userManuallySelectedRef.current = true;
-    setSelectedVehicleId(null);
+    setFocusState(() => ({
+      selectedVehicleId: null,
+      selectedStopId: stopId,
+      selectionOrigin: "stop",
+      promotedVehicleId: null,
+      vehiclePromotionSessionActive: false,
+    }));
     setAutoExpandVehicleRequest(null);
-    setSelectedStopId(stopId);
     setPanelSnapLevel(1);
     flyToStop(stopId);
   }, [flyToStop]);
 
   const focusVehicleFromSearch = useCallback((vehicleId: string) => {
     userManuallySelectedRef.current = true;
-    setSelectedStopId(null);
-    setSelectedVehicleId(vehicleId);
+    setFocusState((current) => selectVehicleFromSearch(current, vehicleId));
     setAutoExpandVehicleRequest(`${vehicleId}:${Date.now()}`);
     setPanelSnapLevel(1);
   }, []);
 
   const handleClearStopSelection = useCallback(() => {
-    setSelectedStopId(null);
+    setFocusState((current) => clearStopFocus(current));
     userManuallySelectedRef.current = true;
   }, []);
 
@@ -568,7 +556,19 @@ export function MapPage() {
 
   useEffect(() => {
     if (!isTrackingLocation || !nearestStop || userManuallySelectedRef.current) return;
-    setSelectedStopId(nearestStop.id);
+    setFocusState((current) => {
+      if (current.selectedStopId === nearestStop.id && !current.selectedVehicleId) {
+        return current;
+      }
+
+      return {
+        selectedVehicleId: null,
+        selectedStopId: nearestStop.id,
+        selectionOrigin: "stop",
+        promotedVehicleId: null,
+        vehiclePromotionSessionActive: false,
+      };
+    });
   }, [isTrackingLocation, nearestStop]);
 
   useEffect(() => {
@@ -684,12 +684,12 @@ export function MapPage() {
           liveMode={dataMode === "live"}
           onSelectVehicle={handleSelectVehicleFromPanel}
           selectedVehicleId={selectedVehicleId}
+          promotedVehicleId={promotedVehicleId}
           snapLevel={panelSnapLevel}
           onSnapLevelChange={setPanelSnapLevel}
           autoExpandVehicleRequest={autoExpandVehicleRequest}
           stop={selectedStop}
           stopEtas={selectedStopEtas}
-          stopDistanceM={selectedStopDistanceM}
           stopKind={selectedStopKind}
           onClearStop={selectedStop ? handleClearStopSelection : undefined}
           isAlertEnabled={isAlertEnabled}
