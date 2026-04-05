@@ -4,6 +4,12 @@ import {
   getUserLocationTrackingMode,
   getUserLocationWatchOptions,
 } from "../../src/hooks/useUserLocation";
+import {
+  USER_FOLLOW_BACKGROUND_MAX_AGE_MS,
+  USER_FOLLOW_BACKGROUND_TIMEOUT_MS,
+  USER_FOLLOW_FOREGROUND_MAX_AGE_MS,
+  USER_FOLLOW_FOREGROUND_TIMEOUT_MS,
+} from "../../src/features/map/user-location-cursor";
 
 describe("useUserLocation helpers", () => {
   it("maps hidden tabs to background mode", () => {
@@ -49,6 +55,29 @@ describe("useUserLocation helpers", () => {
       enableHighAccuracy: false,
       maximumAge: 20_000,
       timeout: 18_000,
+    });
+  });
+
+  it("supports the tighter foreground cadence used by the live user-follow flow", () => {
+    const options = {
+      enableHighAccuracy: true,
+      maximumAge: USER_FOLLOW_FOREGROUND_MAX_AGE_MS,
+      timeout: USER_FOLLOW_FOREGROUND_TIMEOUT_MS,
+      backgroundEnableHighAccuracy: false,
+      backgroundMaximumAge: USER_FOLLOW_BACKGROUND_MAX_AGE_MS,
+      backgroundTimeout: USER_FOLLOW_BACKGROUND_TIMEOUT_MS,
+    };
+
+    expect(getUserLocationWatchOptions(options, "foreground")).toEqual({
+      enableHighAccuracy: true,
+      maximumAge: 4_000,
+      timeout: 10_000,
+    });
+
+    expect(getUserLocationWatchOptions(options, "background")).toEqual({
+      enableHighAccuracy: false,
+      maximumAge: 60_000,
+      timeout: 30_000,
     });
   });
 });

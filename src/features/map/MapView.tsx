@@ -15,9 +15,17 @@ import { loadMapIcons, loadVehicleIcon } from "./map-utils";
 import { getCampusViewport } from "./campus-viewport";
 import { UserLocationMarker } from "./UserLocationMarker";
 import type { UserLocation } from "@/hooks/useUserLocation";
+import type { VisibleUserLocation } from "./user-location-cursor";
 
 import type { Route, Stop, Vehicle } from "../shuttle/api";
 import campusConfig from "../../data/campus-config.json";
+
+type MapViewportChange = {
+  center: [number, number];
+  zoom: number;
+  bearing: number;
+  pitch: number;
+};
 
 type MapViewProps = {
   route?: Route;
@@ -26,9 +34,12 @@ type MapViewProps = {
   onSelectStop: (stopId: string) => void;
   onSelectVehicle: (vehicleId: string | null) => void;
   onMapReady?: (map: MapRef) => void;
+  onViewportChange?: (viewport: MapViewportChange) => void;
   userLocation?: UserLocation | null;
   isTrackingLocation?: boolean;
+  isUserFollowActive?: boolean;
   onToggleTracking?: () => void;
+  onUserLocationFrame?: (location: VisibleUserLocation) => void;
   activeStopId?: string | null;
 };
 
@@ -259,9 +270,12 @@ export function MapView({
   onSelectStop,
   onSelectVehicle,
   onMapReady,
+  onViewportChange,
   userLocation,
   isTrackingLocation,
+  isUserFollowActive,
   onToggleTracking,
+  onUserLocationFrame,
   activeStopId,
 }: MapViewProps) {
   const mapRef = useRef<MapRef | null>(null);
@@ -287,6 +301,7 @@ export function MapView({
         maxZoom={campusConfig.maxZoom}
         bearing={initialBearing}
         styles={MAP_STYLES}
+        onViewportChange={onViewportChange}
       >
         {/* Custom GeoJSON layers (campus boundary, route, stops, vehicles) */}
         <MapLayers
@@ -302,7 +317,12 @@ export function MapView({
         />
 
         {/* User position blue dot */}
-        {userLocation && <UserLocationMarker location={userLocation} />}
+        {userLocation && (
+          <UserLocationMarker
+            location={userLocation}
+            onDisplayLocationChange={onUserLocationFrame}
+          />
+        )}
       </Map>
 
       {/* Custom Navigation Controls (Mobile: Below Header Right, Desktop: Bottom-Left) */}
@@ -339,12 +359,30 @@ export function MapView({
               onClick={onToggleTracking}
               className={`p-2 focus:outline-none hover:bg-[var(--map-control-hover)] ${
                 isTrackingLocation
-                  ? "text-blue-500"
+                  ? isUserFollowActive
+                    ? "text-blue-500"
+                    : "text-amber-500"
                   : "text-[var(--color-text)]"
               }`}
-              title={isTrackingLocation ? "หยุดติดตามตำแหน่ง" : "ค้นหาตำแหน่งของฉัน"}
+              title={
+                isTrackingLocation
+                  ? isUserFollowActive
+                    ? "หยุดติดตามตำแหน่ง"
+                    : "กลับมาติดตามตำแหน่งของฉัน"
+                  : "ค้นหาตำแหน่งของฉัน"
+              }
+              aria-pressed={Boolean(isTrackingLocation && isUserFollowActive)}
             >
-              <Locate size={20} />
+              <Locate
+                size={20}
+                className={
+                  isTrackingLocation && isUserFollowActive
+                  ? "text-blue-500"
+                    : isTrackingLocation
+                      ? "text-amber-500"
+                      : ""
+                }
+              />
             </button>
           )}
         </div>

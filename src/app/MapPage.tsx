@@ -27,6 +27,18 @@ import {
   shouldAutoFocusVehicleSelection,
   type MapFocusState,
 } from "../features/map/focus-state";
+import {
+  USER_FOLLOW_BACKGROUND_MAX_AGE_MS,
+  USER_FOLLOW_BACKGROUND_TIMEOUT_MS,
+  USER_FOLLOW_FOREGROUND_MAX_AGE_MS,
+  USER_FOLLOW_FOREGROUND_TIMEOUT_MS,
+  type VisibleUserLocation,
+} from "../features/map/user-location-cursor";
+import {
+  getUserTrackingToggleAction,
+  shouldDriveUserFollowFrame,
+  shouldPauseUserFollowOnViewportChange,
+} from "../features/map/user-follow-state";
 
 const ALERT_STORAGE_KEY = "map-arrival-alerts-enabled";
 const STOP_PROXIMITY_VIBRATION_DISTANCE_M = 20;
@@ -111,7 +123,14 @@ export function MapPage() {
     isTracking: isTrackingLocation,
     startTracking,
     stopTracking,
-  } = useUserLocation();
+  } = useUserLocation({
+    enableHighAccuracy: true,
+    maximumAge: USER_FOLLOW_FOREGROUND_MAX_AGE_MS,
+    timeout: USER_FOLLOW_FOREGROUND_TIMEOUT_MS,
+    backgroundEnableHighAccuracy: false,
+    backgroundMaximumAge: USER_FOLLOW_BACKGROUND_MAX_AGE_MS,
+    backgroundTimeout: USER_FOLLOW_BACKGROUND_TIMEOUT_MS,
+  });
   const { nearestStop } = useNearestStop(userLocation, allStops);
 
   const [focusState, setFocusState] = useState<MapFocusState>(INITIAL_MAP_FOCUS_STATE);
@@ -120,16 +139,20 @@ export function MapPage() {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [panelSnapLevel, setPanelSnapLevel] = useState<PanelSnapLevel>(0);
   const [autoExpandVehicleRequest, setAutoExpandVehicleRequest] = useState<string | null>(null);
+  const [isUserFollowActive, setIsUserFollowActive] = useState(false);
   const mapRef = useRef<MapRef | null>(null);
   const selectedVehicleIdRef = useRef<string | null>(null);
   const selectedVehicleCoordsRef = useRef<[number, number] | null>(null);
   const followRafRef = useRef<number | null>(null);
+  const userFollowRafRef = useRef<number | null>(null);
   const followLastTsRef = useRef<number | null>(null);
   const isFlyingRef = useRef(false);
-  const hasFlownToUserRef = useRef(false);
   const userManuallySelectedRef = useRef(false);
   const proximityStopIdRef = useRef<string | null>(null);
   const hasEnteredProximityRef = useRef(false);
+  const displayUserLocationRef = useRef<VisibleUserLocation | null>(null);
+  const shouldRecenterUserFollowRef = useRef(false);
+  const programmaticViewportChangeCountRef = useRef(0);
   const {
     selectedVehicleId,
     selectedStopId,
@@ -248,6 +271,87 @@ export function MapPage() {
     });
   }, [allStops, normalizedSearchQuery, telemetryByVehicleId, vehicles]);
 
+  const pauseUserFollow = useCallback(() => {
+    shouldRecenterUserFollowRef.current = false;
+    setIsUserFollowActive(false);
+  }, []);
+
+  const resumeUserFollow = useCallback(() => {
+    shouldRecenterUserFollowRef.current = true;
+    setIsUserFollowActive(true);
+  }, []);
+
+  const beginProgrammaticViewportChange = useCallback(() => {
+    programmaticViewportChangeCountRef.current += 1;
+    let finished = false;
+
+    return () => {
+      if (finished) {
+        return;
+      }
+
+      finished = true;
+      programmaticViewportChangeCountRef.current = Math.max(
+        0,
+        programmaticViewportChangeCountRef.current - 1,
+      );
+    };
+  }, []);
+
+  const runProgrammaticMapJump = useCallback((
+    map: MapRef,
+    options: Parameters<MapRef["jumpTo"]>[0],
+  ) => {
+    const finishViewportChange = beginProgrammaticViewportChange();
+    map.jumpTo(options);
+    finishViewportChange();
+  }, [beginProgrammaticViewportChange]);
+
+  const flyMapToLocation = useCallback((
+    targetCenter: [number, number],
+    options?: {
+      zoom?: number;
+      duration?: number;
+    },
+  ) => {
+    const map = mapRef.current;
+    if (!map) {
+      return false;
+    }
+
+    isFlyingRef.current = true;
+    const finishViewportChange = beginProgrammaticViewportChange();
+
+    map.once("moveend", () => {
+      finishViewportChange();
+      isFlyingRef.current = false;
+    });
+
+    map.flyTo({
+      center: targetCenter,
+      zoom: options?.zoom ?? map.getZoom(),
+      duration: options?.duration ?? 800,
+    });
+
+    return true;
+  }, [beginProgrammaticViewportChange]);
+
+  const getLatestUserFollowTarget = useCallback((): [number, number] | null => {
+    const displayLocation = displayUserLocationRef.current;
+    if (displayLocation) {
+      return [
+        displayLocation.displayLongitude,
+        displayLocation.displayLatitude,
+      ];
+    }
+
+    if (userLocation) {
+      return [userLocation.longitude, userLocation.latitude];
+    }
+
+    return null;
+  }, [userLocation]);
+
   const handleMapReady = useCallback(
     (map: MapRef) => {
       mapRef.current = map;
@@ -297,6 +401,9 @@ export function MapPage() {
       if (followRafRef.current !== null) {
         cancelAnimationFrame(followRafRef.current);
       }
+      if (userFollowRafRef.current !== null) {
+        cancelAnimationFrame(userFollowRafRef.current);
+      }
       mapRef.current = null;
       setMapUpdater(null);
     };
@@ -330,7 +437,7 @@ export function MapPage() {
         const smoothing = 1 - Math.exp(-deltaMs / 140);
 
         followLastTsRef.current = timestamp;
-        map.jumpTo({
+        runProgrammaticMapJump(map, {
           center: [
             center.lng + (target[0] - center.lng) * smoothing,
             center.lat + (target[1] - center.lat) * smoothing,
@@ -357,7 +464,7 @@ export function MapPage() {
       }
       followLastTsRef.current = null;
     };
-  }, [selectedVehicleId, selectionOrigin]);
+  }, [runProgrammaticMapJump, selectedVehicleId, selectionOrigin]);
 
   useEffect(() => {
     try {
@@ -394,20 +501,15 @@ export function MapPage() {
         (vehicle ? ([vehicle.longitude, vehicle.latitude] as [number, number]) : null);
 
       if (targetCenter) {
-        isFlyingRef.current = true;
-        map.flyTo({
-          center: targetCenter,
+        flyMapToLocation(targetCenter, {
           zoom: 17,
           duration: 800,
-        });
-        map.once("moveend", () => {
-          isFlyingRef.current = false;
         });
       }
       return;
     }
 
-  }, [selectionOrigin, selectedStopId, selectedVehicleId, vehicles]);
+  }, [flyMapToLocation, selectionOrigin, selectedStopId, selectedVehicleId, vehicles]);
 
   const handleSelectVehicleFromMap = useCallback((id: string | null) => {
     if (id === null) {
@@ -419,40 +521,38 @@ export function MapPage() {
       setFocusState((current) => clearVehicleFocusFromBlankMap(current));
       userManuallySelectedRef.current = false;
     } else {
+      pauseUserFollow();
       userManuallySelectedRef.current = true;
       setFocusState((current) => selectVehicleFromMap(current, id));
       setPanelSnapLevel(1);
     }
-  }, [selectedVehicleId]);
+  }, [pauseUserFollow, selectedVehicleId]);
 
   const handleSelectVehicleFromPanel = useCallback((id: string | null) => {
     if (id === null) {
       return;
     }
 
+    pauseUserFollow();
     setAutoExpandVehicleRequest(null);
     userManuallySelectedRef.current = true;
     setFocusState((current) => selectVehicleFromPanel(current, id));
-  }, []);
+  }, [pauseUserFollow]);
 
   const flyToStop = useCallback((stopId: string) => {
     const stop = allStops?.find((item) => item.id === stopId);
-    if (!stop || !mapRef.current) return;
+    if (!stop) return;
 
-    isFlyingRef.current = true;
-    mapRef.current.flyTo({
-      center: [stop.longitude, stop.latitude],
+    flyMapToLocation([stop.longitude, stop.latitude], {
       zoom: 17,
       duration: 800,
     });
-    mapRef.current.once("moveend", () => {
-      isFlyingRef.current = false;
-    });
-  }, [allStops]);
+  }, [allStops, flyMapToLocation]);
 
   const handleSelectStop = useCallback(
     (stopId: string) => {
       const nextStopId = selectedStopId === stopId ? null : stopId;
+      pauseUserFollow();
       setFocusState((current) =>
         nextStopId === null ? INITIAL_MAP_FOCUS_STATE : selectStop(current, stopId)
       );
@@ -467,10 +567,11 @@ export function MapPage() {
         flyToStop(stopId);
       }
     },
-    [flyToStop, selectedStopId]
+    [flyToStop, pauseUserFollow, selectedStopId]
   );
 
   const focusStopFromSearch = useCallback((stopId: string) => {
+    pauseUserFollow();
     userManuallySelectedRef.current = true;
     setFocusState(() => ({
       selectedVehicleId: null,
@@ -482,14 +583,15 @@ export function MapPage() {
     setAutoExpandVehicleRequest(null);
     setPanelSnapLevel(1);
     flyToStop(stopId);
-  }, [flyToStop]);
+  }, [flyToStop, pauseUserFollow]);
 
   const focusVehicleFromSearch = useCallback((vehicleId: string) => {
+    pauseUserFollow();
     userManuallySelectedRef.current = true;
     setFocusState((current) => selectVehicleFromSearch(current, vehicleId));
     setAutoExpandVehicleRequest(`${vehicleId}:${Date.now()}`);
     setPanelSnapLevel(1);
-  }, []);
+  }, [pauseUserFollow]);
 
   const handleClearStopSelection = useCallback(() => {
     setFocusState((current) => clearStopFocus(current));
@@ -542,17 +644,60 @@ export function MapPage() {
     searchResults,
   ]);
 
+  const handleUserLocationFrame = useCallback((location: VisibleUserLocation) => {
+    displayUserLocationRef.current = location;
+  }, []);
+
+  const handleViewportChange = useCallback(() => {
+    if (
+      shouldPauseUserFollowOnViewportChange({
+        isTrackingLocation,
+        isUserFollowActive,
+        isProgrammaticViewportChange:
+          programmaticViewportChangeCountRef.current > 0,
+      })
+    ) {
+      pauseUserFollow();
+    }
+  }, [isTrackingLocation, isUserFollowActive, pauseUserFollow]);
+
   const handleToggleTracking = useCallback(() => {
-    if (isTrackingLocation) {
+    const toggleAction = getUserTrackingToggleAction(
+      isTrackingLocation,
+      isUserFollowActive,
+    );
+
+    if (toggleAction === "stop") {
       stopTracking();
-      hasFlownToUserRef.current = false;
+      pauseUserFollow();
       userManuallySelectedRef.current = false;
       return;
     }
 
-    startTracking();
+    if (toggleAction === "start") {
+      startTracking();
+    }
+
+    setFocusState(INITIAL_MAP_FOCUS_STATE);
+    setAutoExpandVehicleRequest(null);
     userManuallySelectedRef.current = false;
-  }, [isTrackingLocation, startTracking, stopTracking]);
+    resumeUserFollow();
+  }, [
+    isTrackingLocation,
+    isUserFollowActive,
+    pauseUserFollow,
+    resumeUserFollow,
+    startTracking,
+    stopTracking,
+  ]);
+
+  useEffect(() => {
+    if (isTrackingLocation) {
+      return;
+    }
+
+    pauseUserFollow();
+  }, [isTrackingLocation, pauseUserFollow]);
 
   useEffect(() => {
     if (!isTrackingLocation || !nearestStop || userManuallySelectedRef.current) return;
@@ -572,15 +717,87 @@ export function MapPage() {
   }, [isTrackingLocation, nearestStop]);
 
   useEffect(() => {
-    if (!userLocation || hasFlownToUserRef.current || !mapRef.current) return;
+    if (
+      !isTrackingLocation ||
+      !isUserFollowActive ||
+      !shouldRecenterUserFollowRef.current
+    ) {
+      return;
+    }
 
-    hasFlownToUserRef.current = true;
-    mapRef.current.flyTo({
-      center: [userLocation.longitude, userLocation.latitude],
+    const targetCenter = getLatestUserFollowTarget();
+    if (!targetCenter) {
+      return;
+    }
+
+    shouldRecenterUserFollowRef.current = false;
+    flyMapToLocation(targetCenter, {
       zoom: 17,
-      duration: 1200,
+      duration: 1_000,
     });
-  }, [userLocation]);
+  }, [
+    flyMapToLocation,
+    getLatestUserFollowTarget,
+    isTrackingLocation,
+    isUserFollowActive,
+    userLocation,
+  ]);
+
+  useEffect(() => {
+    if (userFollowRafRef.current !== null) {
+      cancelAnimationFrame(userFollowRafRef.current);
+      userFollowRafRef.current = null;
+    }
+
+    if (
+      !shouldDriveUserFollowFrame({
+        isTrackingLocation,
+        isUserFollowActive,
+        hasDisplayLocation: Boolean(displayUserLocationRef.current ?? userLocation),
+      })
+    ) {
+      return;
+    }
+
+    const followUser = () => {
+      const map = mapRef.current;
+      const targetCenter = getLatestUserFollowTarget();
+
+      if (
+        map &&
+        targetCenter &&
+        !isFlyingRef.current &&
+        !shouldRecenterUserFollowRef.current
+      ) {
+        const center = map.getCenter();
+        if (
+          Math.abs(center.lng - targetCenter[0]) > 1e-7 ||
+          Math.abs(center.lat - targetCenter[1]) > 1e-7
+        ) {
+          runProgrammaticMapJump(map, {
+            center: targetCenter,
+          });
+        }
+      }
+
+      userFollowRafRef.current = requestAnimationFrame(followUser);
+    };
+
+    userFollowRafRef.current = requestAnimationFrame(followUser);
+
+    return () => {
+      if (userFollowRafRef.current !== null) {
+        cancelAnimationFrame(userFollowRafRef.current);
+        userFollowRafRef.current = null;
+      }
+    };
+  }, [
+    getLatestUserFollowTarget,
+    isTrackingLocation,
+    isUserFollowActive,
+    runProgrammaticMapJump,
+    userLocation,
+  ]);
 
   const handleToggleAlert = useCallback(async () => {
     if (isAlertEnabled) {
@@ -659,9 +876,12 @@ export function MapPage() {
           onSelectStop={handleSelectStop}
           onSelectVehicle={handleSelectVehicleFromMap}
           onMapReady={handleMapReady}
+          onViewportChange={handleViewportChange}
           userLocation={userLocation}
           isTrackingLocation={isTrackingLocation}
+          isUserFollowActive={isUserFollowActive}
           onToggleTracking={handleToggleTracking}
+          onUserLocationFrame={handleUserLocationFrame}
           activeStopId={activeStopId}
         />
       </div>
