@@ -46,7 +46,7 @@ Notes: programmatic open should still start from the existing snap preset before
 - [x] Run `pnpm test`
 - [x] Run `pnpm lint`
 - [x] Run `pnpm build`
-- [ ] Commit and push to `master`
+- [x] Commit and push to `master`
 
 Success criteria: the new interaction model is covered by tests and passes test, lint, and build.
 
