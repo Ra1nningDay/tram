@@ -162,10 +162,28 @@ model VehicleLocation {
   longitude  Float
   heading    Float?
   speed      Float?
+  accuracy   Float?
   source     String   // "hardware" | "driver"
+  sourceRef  String?
+  observedAt DateTime?
   recordedAt DateTime @default(now())
 
   @@index([vehicleId, recordedAt(sort: Desc)])
   @@index([recordedAt(sort: Desc)])
   @@map("vehicle_locations")
+}
+
+model VehicleHardwareMapping {
+  id               String   @id @default(cuid())
+  vehicleId        String
+  displayLabel     String?
+  hardwareVehicleId String? @unique
+  hardwareId       String?  @unique
+  enabled          Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([vehicleId])
+  @@index([enabled])
+  @@map("vehicle_hardware_mappings")
 }

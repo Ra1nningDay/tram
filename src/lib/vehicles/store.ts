@@ -1,185 +1,214 @@
 import type { Vehicle } from "@/features/shuttle/api";
+import { mergeVehicleSourceStates } from "@/lib/vehicles/source-arbitration";
+import { deriveVehicleStatus, normalizeLiveVehicleFeed } from "@/lib/vehicles/status";
+import {
+  buildVehicleSourceKey,
+  deleteResolutionState,
+  deleteSourceVehicleState,
+  deleteSourceVehicleStateByKey,
+  readAllResolutionStates,
+  readAllSourceVehicleStates,
+  readSourceVehicleState,
+  upsertResolutionState,
+  upsertSourceVehicleState,
+  type SourceVehicleState,
+  type VehicleSource,
+} from "@/lib/vehicles/source-state";
 import {
   buildLiveVehicleTelemetryState,
   getTelemetryRouteContext,
+  resolveTelemetryDirection,
   type LiveVehicleTelemetryState,
   type RawVehicleFix,
 } from "@/lib/vehicles/telemetry";
-import { deriveVehicleStatus } from "@/lib/vehicles/status";
 
-// ── Types ────────────────────────────────────────────────────────────────────
+export type { VehicleSource } from "@/lib/vehicles/source-state";
+export type IngestedVehicle = SourceVehicleState;
 
-export type VehicleSource = "hardware" | "driver";
-
-export type IngestedVehicle = {
-  id: string;
-  label?: string;
-  direction: Vehicle["direction"];
-  source: VehicleSource;
-  crowding?: Vehicle["crowding"];
-  sessionId?: string;
-  rawFix: RawVehicleFix;
-  previousRawFix?: RawVehicleFix;
-  telemetry: LiveVehicleTelemetryState;
-  receivedAt: Date;
-};
-
-// ── In-Memory Store ──────────────────────────────────────────────────────────
-// Holds the latest known position for each vehicle.
-// Shared across requests within a single Node.js process.
-
-declare global {
-  // eslint-disable-next-line no-var
-  var __vehicleStore: Map<string, IngestedVehicle> | undefined;
-}
-
-function getStore(): Map<string, IngestedVehicle> {
-  if (!global.__vehicleStore) {
-    global.__vehicleStore = new Map();
-  }
-  return global.__vehicleStore;
-}
-
-// ── Public API ───────────────────────────────────────────────────────────────
-
-/**
- * Upsert the latest position for a vehicle.
- * Returns the updated vehicle record.
- */
-export async function upsertVehicle(data: {
+type UpsertVehicleInput = {
   id: string;
   label?: string;
   latitude: number;
   longitude: number;
   heading?: number;
   speed?: number;
-  direction: "outbound" | "inbound";
+  direction?: Vehicle["direction"];
   source: VehicleSource;
   crowding?: Vehicle["crowding"];
   sessionId?: string;
-}): Promise<IngestedVehicle> {
-  const store = getStore();
-  const now = new Date();
-  const existing = store.get(data.id);
+  accuracyM?: number;
+  observedAt?: string | Date;
+  sourceRef?: string;
+  hardwareVehicleId?: string;
+  hardwareId?: string;
+};
+
+function resolveObservedAt(value?: string | Date): Date {
+  if (value instanceof Date && Number.isFinite(value.getTime())) {
+    return value;
+  }
+
+  if (typeof value === "string") {
+    const resolved = new Date(value);
+    if (Number.isFinite(resolved.getTime())) {
+      return resolved;
+    }
+  }
+
+  return new Date();
+}
+
+export async function upsertVehicle(data: UpsertVehicleInput): Promise<IngestedVehicle> {
+  const existing = await readSourceVehicleState(data.id, data.source);
+  const observedAt = resolveObservedAt(data.observedAt);
   const rawFix: RawVehicleFix = {
     latitude: data.latitude,
     longitude: data.longitude,
     heading: data.heading,
     speed: data.speed,
-    receivedAt: now,
+    receivedAt: observedAt,
   };
-
+  const routeContext = await getTelemetryRouteContext();
+  const direction =
+    data.direction ??
+    resolveTelemetryDirection({
+      rawFix,
+      routeContext,
+      previousDirection: existing?.direction,
+    });
+  const lastUpdated = observedAt.toISOString();
   const telemetry = buildLiveVehicleTelemetryState(
     {
       id: data.id,
-      label: data.label,
-      direction: data.direction,
-      crowding: data.crowding,
-      lastUpdated: now.toISOString(),
+      label: data.label ?? existing?.label,
+      direction,
+      crowding: data.crowding ?? existing?.crowding,
+      lastUpdated,
       rawFix,
       previousRawFix: existing?.rawFix,
       previousTelemetry: existing?.telemetry,
     },
-    await getTelemetryRouteContext(),
+    routeContext,
   );
 
   const vehicle: IngestedVehicle = {
-    id: data.id,
-    label: data.label,
-    direction: data.direction,
+    vehicleId: data.id,
+    label: data.label ?? existing?.label,
     source: data.source,
-    crowding: data.crowding,
-    sessionId: data.sessionId,
+    direction,
+    crowding: data.crowding ?? existing?.crowding,
+    sessionId: data.sessionId ?? existing?.sessionId,
+    accuracyM: data.accuracyM,
+    observedAt: lastUpdated,
+    sourceRef: data.sourceRef,
+    hardwareVehicleId: data.hardwareVehicleId,
+    hardwareId: data.hardwareId,
     rawFix,
     previousRawFix: existing?.rawFix,
     telemetry,
-    receivedAt: now,
+    receivedAt: new Date(),
   };
 
-  store.set(data.id, vehicle);
+  await upsertSourceVehicleState(vehicle);
   return vehicle;
 }
 
-/**
- * Remove a vehicle from the live in-memory store immediately.
- * Returns true when the vehicle existed.
- */
-export function removeVehicle(id: string, sessionId?: string): boolean {
-  const store = getStore();
-  const current = store.get(id);
-
-  if (!current) {
-    return false;
-  }
-
-  if (sessionId && current.sessionId && current.sessionId !== sessionId) {
-    return false;
-  }
-
-  return store.delete(id);
+export async function removeVehicleSource(
+  vehicleId: string,
+  source: VehicleSource,
+  sessionId?: string,
+): Promise<boolean> {
+  return deleteSourceVehicleState(vehicleId, source, sessionId);
 }
 
-/**
- * Return all vehicles, applying staleness logic.
- */
-export function getAllVehicles(): Vehicle[] {
-  const store = getStore();
-  const nowMs = Date.now();
-  const hiddenVehicleIds: string[] = [];
-  const vehicles: Vehicle[] = [];
+export async function removeVehicle(id: string, sessionId?: string): Promise<boolean> {
+  return removeVehicleSource(id, "driver", sessionId);
+}
 
-  for (const v of store.values()) {
-    const status = deriveVehicleStatus(v.telemetry.snapshot.last_updated, nowMs);
+async function buildMergedVehicleTelemetryStates(
+  nowMs: number = Date.now(),
+): Promise<LiveVehicleTelemetryState[]> {
+  const [sourceStates, resolutionStates] = await Promise.all([
+    readAllSourceVehicleStates(),
+    readAllResolutionStates(),
+  ]);
+  const groupedStates = new Map<string, SourceVehicleState[]>();
+  const hiddenStateKeys: string[] = [];
+
+  for (const state of sourceStates) {
+    const status = deriveVehicleStatus(state.telemetry.snapshot.last_updated, nowMs);
 
     if (status === "hidden") {
-      hiddenVehicleIds.push(v.id);
+      hiddenStateKeys.push(buildVehicleSourceKey(state.vehicleId, state.source));
       continue;
     }
 
-    vehicles.push({
-      ...v.telemetry.snapshot,
-      status,
-    });
+    const current = groupedStates.get(state.vehicleId);
+    if (current) {
+      current.push(state);
+    } else {
+      groupedStates.set(state.vehicleId, [state]);
+    }
   }
 
-  for (const vehicleId of hiddenVehicleIds) {
-    store.delete(vehicleId);
-  }
-
-  return vehicles;
-}
-
-/** True when at least one vehicle has been ingested (not mock). */
-export function hasLiveVehicles(): boolean {
-  return getStore().size > 0;
-}
-
-export function getAllVehicleTelemetryStates(): LiveVehicleTelemetryState[] {
-  const store = getStore();
-  const nowMs = Date.now();
-  const hiddenVehicleIds: string[] = [];
+  const resolutionByVehicleId = new Map(
+    resolutionStates.map((state) => [state.vehicleId, state] as const),
+  );
   const telemetryStates: LiveVehicleTelemetryState[] = [];
+  const pendingMutations: Promise<unknown>[] = hiddenStateKeys.map((fieldKey) =>
+    deleteSourceVehicleStateByKey(fieldKey),
+  );
 
-  for (const vehicle of store.values()) {
-    const status = deriveVehicleStatus(vehicle.telemetry.snapshot.last_updated, nowMs);
+  for (const [vehicleId, states] of groupedStates.entries()) {
+    const { telemetryState, resolutionState } = mergeVehicleSourceStates({
+      vehicleId,
+      states,
+      previousResolution: resolutionByVehicleId.get(vehicleId),
+      nowMs,
+    });
 
-    if (status === "hidden") {
-      hiddenVehicleIds.push(vehicle.id);
+    if (!telemetryState) {
+      pendingMutations.push(deleteResolutionState(vehicleId));
       continue;
     }
 
-    telemetryStates.push({
-      ...vehicle.telemetry,
-      snapshot: {
-        ...vehicle.telemetry.snapshot,
-        status,
-      },
-    });
+    telemetryStates.push(telemetryState);
+
+    if (resolutionState) {
+      pendingMutations.push(upsertResolutionState(resolutionState));
+    } else {
+      pendingMutations.push(deleteResolutionState(vehicleId));
+    }
   }
 
-  for (const vehicleId of hiddenVehicleIds) {
-    store.delete(vehicleId);
+  for (const vehicleId of resolutionByVehicleId.keys()) {
+    if (!groupedStates.has(vehicleId)) {
+      pendingMutations.push(deleteResolutionState(vehicleId));
+    }
   }
 
-  return telemetryStates;
+  if (pendingMutations.length > 0) {
+    await Promise.allSettled(pendingMutations);
+  }
+
+  return telemetryStates.sort((left, right) =>
+    left.snapshot.id.localeCompare(right.snapshot.id),
+  );
+}
+
+export async function getAllVehicles(): Promise<Vehicle[]> {
+  const telemetryStates = await buildMergedVehicleTelemetryStates();
+  return telemetryStates.map((telemetry) => telemetry.snapshot);
+}
+
+export async function hasLiveVehicles(): Promise<boolean> {
+  return (await getAllVehicles()).length > 0;
+}
+
+export async function getAllVehicleTelemetryStates(): Promise<LiveVehicleTelemetryState[]> {
+  return buildMergedVehicleTelemetryStates();
+}
+
+export async function getCurrentLiveVehicleFeed(): Promise<Vehicle[]> {
+  return normalizeLiveVehicleFeed(await getAllVehicles());
 }

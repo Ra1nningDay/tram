@@ -9,22 +9,49 @@ import {
   getAllVehicles,
   upsertVehicle,
 } from "../../src/lib/vehicles/store";
+import { resetVehicleSourceStateStores } from "../../src/lib/vehicles/source-state";
+
+type VehicleHardwareMappingMockRecord = {
+  id: string;
+  vehicleId: string;
+  displayLabel: string | null;
+  hardwareVehicleId: string | null;
+  hardwareId: string | null;
+  enabled: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+type LocalSubscriber = {
+  connect: () => Promise<void>;
+  subscribe: (channel: string) => Promise<void>;
+  on: (event: string, handler: (channel: string, message: string) => void) => LocalSubscriber;
+  unsubscribe: () => Promise<void>;
+  quit: () => Promise<void>;
+};
 
 const prismaMocks = vi.hoisted(() => {
   const vehicleLocationCreate = vi.fn(async () => undefined);
   const shuttleRouteFindMany = vi.fn(async () => []);
   const stopFindMany = vi.fn(async () => []);
+  const vehicleHardwareMappingFindMany = vi.fn<
+    [],
+    Promise<VehicleHardwareMappingMockRecord[]>
+  >(async () => []);
 
   return {
     vehicleLocationCreate,
     shuttleRouteFindMany,
     stopFindMany,
+    vehicleHardwareMappingFindMany,
     reset() {
       vehicleLocationCreate.mockClear();
       shuttleRouteFindMany.mockClear();
       stopFindMany.mockClear();
+      vehicleHardwareMappingFindMany.mockClear();
       shuttleRouteFindMany.mockResolvedValue([]);
       stopFindMany.mockResolvedValue([]);
+      vehicleHardwareMappingFindMany.mockResolvedValue([]);
     },
   };
 });
@@ -32,13 +59,7 @@ const prismaMocks = vi.hoisted(() => {
 const redisMocks = vi.hoisted(() => {
   let messageHandler: ((channel: string, message: string) => void) | null = null;
 
-  const localSub = {} as {
-    connect: any;
-    subscribe: any;
-    on: any;
-    unsubscribe: any;
-    quit: any;
-  };
+  const localSub = {} as LocalSubscriber;
 
   localSub.connect = vi.fn(async () => undefined);
   localSub.subscribe = vi.fn(async () => undefined);
@@ -59,12 +80,18 @@ const redisMocks = vi.hoisted(() => {
   const readVehicleSnapshot = vi.fn<[], Promise<VehicleFeedSnapshot | null>>(
     async () => null,
   );
+  const readRedisHash = vi.fn(async () => null);
+  const writeRedisHashValue = vi.fn(async () => false);
+  const deleteRedisHashValue = vi.fn(async () => false);
   const duplicate = vi.fn(() => localSub);
 
   return {
     localSub,
     publishVehicleUpdate,
     readVehicleSnapshot,
+    readRedisHash,
+    writeRedisHashValue,
+    deleteRedisHashValue,
     duplicate,
     emitMessage(payload: object | string) {
       const encoded =
@@ -77,6 +104,12 @@ const redisMocks = vi.hoisted(() => {
       publishVehicleUpdate.mockResolvedValue(undefined);
       readVehicleSnapshot.mockClear();
       readVehicleSnapshot.mockResolvedValue(null);
+      readRedisHash.mockClear();
+      readRedisHash.mockResolvedValue(null);
+      writeRedisHashValue.mockClear();
+      writeRedisHashValue.mockResolvedValue(false);
+      deleteRedisHashValue.mockClear();
+      deleteRedisHashValue.mockResolvedValue(false);
       duplicate.mockClear();
       localSub.connect.mockClear();
       localSub.subscribe.mockClear();
@@ -98,6 +131,9 @@ vi.mock("@/lib/prisma", () => ({
     stop: {
       findMany: prismaMocks.stopFindMany,
     },
+    vehicleHardwareMapping: {
+      findMany: prismaMocks.vehicleHardwareMappingFindMany,
+    },
   }),
 }));
 
@@ -117,30 +153,42 @@ vi.mock("@/lib/redis", () => ({
   CHANNEL_VEHICLES: "vehicles:update",
   publishVehicleUpdate: redisMocks.publishVehicleUpdate,
   readVehicleSnapshot: redisMocks.readVehicleSnapshot,
+  readRedisHash: redisMocks.readRedisHash,
+  writeRedisHashValue: redisMocks.writeRedisHashValue,
+  deleteRedisHashValue: redisMocks.deleteRedisHashValue,
   redisSubscriber: {
     duplicate: redisMocks.duplicate,
   },
 }));
 
 type GpsIngestRouteModule = typeof import("../../src/app/api/gps/ingest/route");
+type HardwareSyncRouteModule = typeof import("../../src/app/api/gps/hardware/sync/route");
 type VehiclesRouteModule = typeof import("../../src/app/api/vehicles/route");
 type VehiclesStreamRouteModule = typeof import("../../src/app/api/vehicles/stream/route");
 type StopEtasRouteModule = typeof import("../../src/app/api/stops/[id]/etas/route");
 
 let gpsIngestRoute: GpsIngestRouteModule;
+let hardwareSyncRoute: HardwareSyncRouteModule;
 let vehiclesRoute: VehiclesRouteModule;
 let vehiclesStreamRoute: VehiclesStreamRouteModule;
 let stopEtasRoute: StopEtasRouteModule;
-
-type VehicleStoreGlobal = typeof globalThis & {
-  __vehicleStore?: unknown;
-};
 
 function createHardwareRequest(body: object) {
   return new Request("http://localhost/api/gps/ingest", {
     method: "POST",
     headers: {
       authorization: "Bearer test-gps-key",
+      "content-type": "application/json",
+    },
+    body: JSON.stringify(body),
+  });
+}
+
+function createHardwareSyncRequest(body: object) {
+  return new Request("http://localhost/api/gps/hardware/sync", {
+    method: "POST",
+    headers: {
+      "x-hardware-sync-secret": "test-hardware-sync-secret",
       "content-type": "application/json",
     },
     body: JSON.stringify(body),
@@ -183,14 +231,16 @@ function extractSsePayload(chunk: string) {
 describe("live vehicle API routes", () => {
   beforeAll(async () => {
     process.env.GPS_INGEST_API_KEY = "test-gps-key";
+    process.env.HARDWARE_SYNC_SECRET = "test-hardware-sync-secret";
     gpsIngestRoute = await import("../../src/app/api/gps/ingest/route");
+    hardwareSyncRoute = await import("../../src/app/api/gps/hardware/sync/route");
     vehiclesRoute = await import("../../src/app/api/vehicles/route");
     vehiclesStreamRoute = await import("../../src/app/api/vehicles/stream/route");
     stopEtasRoute = await import("../../src/app/api/stops/[id]/etas/route");
   });
 
   beforeEach(() => {
-    delete (globalThis as VehicleStoreGlobal).__vehicleStore;
+    resetVehicleSourceStateStores();
     resetTelemetryRouteContextCache();
     prismaMocks.reset();
     redisMocks.reset();
@@ -236,7 +286,11 @@ describe("live vehicle API routes", () => {
         vehicleId: "TRAM-API",
       }),
     );
-    expect(getAllVehicles().map((vehicle) => vehicle.id)).toEqual(["TRAM-API"]);
+    await expect(getAllVehicles()).resolves.toEqual([
+      expect.objectContaining({
+        id: "TRAM-API",
+      }),
+    ]);
 
     const vehiclesResponse = await vehiclesRoute.GET();
     expect(vehiclesResponse.status).toBe(200);
@@ -267,6 +321,85 @@ describe("live vehicle API routes", () => {
     expect(
       stopEtasPayload.etas.some((eta) => eta.vehicle_id === "TRAM-API"),
     ).toBe(true);
+  });
+
+  it("merges driver and hardware source states into one live vehicle", async () => {
+    const routeContext = await getTelemetryRouteContext();
+    const [hardwareLongitude, hardwareLatitude] = routeContext.outbound?.coordinates[0] ?? [100.837, 13.612];
+    const driverObservedAt = new Date();
+    const hardwareObservedAt = new Date(driverObservedAt.getTime() + 2_000);
+
+    prismaMocks.vehicleHardwareMappingFindMany.mockResolvedValue([
+      {
+        id: "mapping-1",
+        vehicleId: "TRAM-MERGED",
+        displayLabel: "TRAM-MERGED",
+        hardwareVehicleId: "TRAM-02",
+        hardwareId: "HWID-2",
+        enabled: true,
+        createdAt: new Date("2026-04-04T10:00:00.000Z"),
+        updatedAt: new Date("2026-04-04T10:00:00.000Z"),
+      },
+    ]);
+
+    await upsertVehicle({
+      id: "TRAM-MERGED",
+      label: "TRAM-MERGED",
+      latitude: hardwareLatitude,
+      longitude: hardwareLongitude,
+      heading: 90,
+      speed: 3,
+      direction: "outbound",
+      source: "driver",
+      crowding: "full",
+      sessionId: "session-merged",
+      observedAt: driverObservedAt,
+    });
+
+    const hardwareResponse = await hardwareSyncRoute.POST(
+      createHardwareSyncRequest({
+        polledAt: hardwareObservedAt.toISOString(),
+        payload: [
+          {
+            Tram_GEO_Info: {
+              accuracy: 1.8,
+              direction: "E",
+              heading: 90,
+              latitude: hardwareLatitude,
+              longitude: hardwareLongitude,
+              speed: 14.4,
+            },
+            Tram_Info: {
+              hardware_id: "HWID-2",
+              id: "TRAM-02",
+              status: "Active",
+            },
+            application_update: hardwareObservedAt.toISOString(),
+          },
+        ],
+      }) as never,
+    );
+
+    expect(hardwareResponse.status).toBe(200);
+    await expect(hardwareResponse.json()).resolves.toEqual({
+      ok: true,
+      total: 1,
+      active: 1,
+      inactive: 0,
+      unmapped: 0,
+    });
+
+    const publishedSnapshot =
+      redisMocks.publishVehicleUpdate.mock.calls.at(-1)?.[0] as unknown as VehicleFeedSnapshot;
+
+    expect(publishedSnapshot.vehicles).toEqual([
+      expect.objectContaining({
+        id: "TRAM-MERGED",
+        telemetrySource: "hardware",
+        crowding: "full",
+        sourceConfidence: expect.any(Number),
+      }),
+    ]);
   });
 
   it("streams the initial snapshot, forwards redis updates, and cleans up the subscriber on cancel", async () => {

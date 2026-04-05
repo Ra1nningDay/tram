@@ -135,8 +135,7 @@ export function AdminSidebar({ open, onClose }: AdminSidebarProps) {
   // Close sidebar on route change (mobile)
   useEffect(() => {
     onClose();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pathname]);
+  }, [onClose, pathname]);
 
   // Prevent body scroll when sidebar overlay is open on mobile
   useEffect(() => {

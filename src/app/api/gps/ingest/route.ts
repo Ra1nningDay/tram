@@ -5,8 +5,7 @@ import { getAuth } from "@/lib/auth";
 import { getPrisma } from "@/lib/prisma";
 import { publishVehicleUpdate } from "@/lib/redis";
 import { buildLiveVehicleFeedSnapshot } from "@/lib/vehicles/live";
-import { upsertVehicle } from "@/lib/vehicles/store";
-import { removeVehicle } from "@/lib/vehicles/store";
+import { removeVehicleSource, upsertVehicle } from "@/lib/vehicles/store";
 import type { VehicleSource } from "@/lib/vehicles/store";
 
 export const runtime = "nodejs";
@@ -144,6 +143,8 @@ export async function POST(req: NextRequest) {
     source,
     crowding: body.crowding,
     sessionId: body.session_id,
+    observedAt: new Date(),
+    sourceRef: body.session_id,
   });
 
   // 4. Persist GPS history to PostgreSQL (fire-and-forget)
@@ -158,6 +159,8 @@ export async function POST(req: NextRequest) {
         heading: body.heading,
         speed: body.speed,
         source,
+        observedAt: new Date(),
+        sourceRef: body.session_id,
       },
     });
   } catch (err) {
@@ -199,7 +202,7 @@ export async function DELETE(req: NextRequest) {
     );
   }
 
-  const removed = removeVehicle(body.vehicle_id, body.session_id);
+  const removed = await removeVehicleSource(body.vehicle_id, source, body.session_id);
 
   try {
     await publishVehicleUpdate(await buildLiveVehicleFeedSnapshot());

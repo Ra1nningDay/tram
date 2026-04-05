@@ -495,11 +495,6 @@ export function useGpsReporter(opts: GpsReporterOptions) {
       stopVehicleSession(previousVehicleId, previousSessionId, pendingReport);
     }
 
-    const crowdingChanged =
-      previousVehicleId === opts.vehicleId && previousCrowding !== nextCrowding;
-    const directionChanged =
-      previousVehicleId === opts.vehicleId && previousDirection !== nextDirection;
-
     if (
       shouldForceGpsReportOnStateChange({
         previousVehicleId,

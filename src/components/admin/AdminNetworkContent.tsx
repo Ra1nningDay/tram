@@ -3,6 +3,7 @@
 import { Clock3, Map, Pentagon, Route, Shapes, Waypoints } from "lucide-react";
 import Link from "next/link";
 
+import { AdminHardwareMappingsPanel } from "@/components/admin/AdminHardwareMappingsPanel";
 import { useAdminLocale } from "@/components/admin/LocaleProvider";
 import { MetricCard } from "@/components/admin/MetricCard";
 import { QuickActionCard } from "@/components/admin/QuickActionCard";
@@ -23,6 +24,26 @@ type NetworkData = {
   colorUsage: { name: string; count: number }[];
   polygonSettings: { minZoom: number; maxZoom: number; initialZoom: number; maskOpacity: number };
   bounds: { minLng: number; maxLng: number; minLat: number; maxLat: number };
+  hardwareMappings: {
+    id: string;
+    vehicleId: string;
+    displayLabel: string | null;
+    hardwareVehicleId: string | null;
+    hardwareId: string | null;
+    enabled: boolean;
+    updatedAt: Date | string;
+  }[];
+  pendingHardware: {
+    sourceKey: string;
+    hardwareVehicleId?: string;
+    hardwareId?: string;
+    label?: string;
+    latitude: number;
+    longitude: number;
+    accuracyM?: number;
+    observedAt: string;
+    lastPolledAt: string;
+  }[];
 };
 
 function formatDateTime(date: Date | null, locale: string) {
@@ -187,6 +208,12 @@ export function AdminNetworkContent({ network }: { network: NetworkData }) {
           </div>
         </SectionCard>
       </section>
+
+      <AdminHardwareMappingsPanel
+        locale={locale}
+        mappings={network.hardwareMappings}
+        pendingHardware={network.pendingHardware}
+      />
     </div>
   );
 }

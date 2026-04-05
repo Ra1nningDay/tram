@@ -31,7 +31,8 @@
     "prisma:format": "prisma format",
     "prisma:migrate:dev": "prisma migrate dev",
     "prisma:studio": "prisma studio",
-    "seed:admin": "node scripts/seed-admin.mjs"
+    "seed:admin": "node scripts/seed-admin.mjs",
+    "hardware:poll": "node scripts/poll-hardware-feed.mjs"
   },
   "dependencies": {
     "@better-auth/core": "^1.5.4",

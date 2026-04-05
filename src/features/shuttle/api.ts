@@ -3,6 +3,7 @@ import { resolveApiUrl } from "../../lib/config";
 export type Status = "fresh" | "delayed" | "offline" | "hidden";
 export type VehicleCrowding = "normal" | "full";
 export type MatchedPosition = { lng: number; lat: number };
+export type VehicleTelemetrySource = "driver" | "hardware";
 
 export type Vehicle = {
   id: string;
@@ -18,6 +19,8 @@ export type Vehicle = {
   routeDistanceM?: number;
   matchedPosition?: MatchedPosition;
   etaConfidence?: number;
+  telemetrySource?: VehicleTelemetrySource;
+  sourceConfidence?: number;
 };
 
 export type VehicleTelemetry = {

@@ -1,4 +1,6 @@
 import { getShuttleData, getMapConfig } from "@/lib/data/shuttle-data";
+import { listVehicleHardwareMappings } from "@/lib/vehicles/hardware-mappings";
+import { readPendingHardwarePreviews } from "@/lib/vehicles/source-state";
 
 type RouteDirectionSummary = {
   direction: string;
@@ -27,6 +29,30 @@ type UsageEntry = {
   count: number;
 };
 
+type HardwareMappingPreview = {
+  id: string;
+  vehicleId: string;
+  displayLabel: string | null;
+  hardwareVehicleId: string | null;
+  hardwareId: string | null;
+  enabled: boolean;
+  updatedAt: Date;
+};
+
+type PendingHardwarePreview = {
+  sourceKey: string;
+  hardwareVehicleId?: string;
+  hardwareId?: string;
+  label?: string;
+  latitude: number;
+  longitude: number;
+  heading?: number;
+  speedMps?: number;
+  accuracyM?: number;
+  observedAt: string;
+  lastPolledAt: string;
+};
+
 export type AdminNetworkData = {
   routeCount: number;
   directionCount: number;
@@ -52,6 +78,8 @@ export type AdminNetworkData = {
     minLat: number;
     maxLat: number;
   };
+  hardwareMappings: HardwareMappingPreview[];
+  pendingHardware: PendingHardwarePreview[];
 };
 
 function countUsage(values: string[]) {
@@ -78,10 +106,30 @@ function getPolygonBounds(polygon: Array<[number, number]>) {
   };
 }
 
+async function safeListHardwareMappings(): Promise<HardwareMappingPreview[]> {
+  try {
+    return await listVehicleHardwareMappings();
+  } catch (error) {
+    console.warn("[admin/network] failed to load hardware mappings:", error);
+    return [];
+  }
+}
+
+async function safeReadPendingHardware(): Promise<PendingHardwarePreview[]> {
+  try {
+    return await readPendingHardwarePreviews();
+  } catch (error) {
+    console.warn("[admin/network] failed to load pending hardware previews:", error);
+    return [];
+  }
+}
+
 export async function getAdminNetworkData(): Promise<AdminNetworkData> {
-  const [shuttleData, mapConfig] = await Promise.all([
+  const [shuttleData, mapConfig, hardwareMappings, pendingHardware] = await Promise.all([
     getShuttleData(),
     getMapConfig(),
+    safeListHardwareMappings(),
+    safeReadPendingHardware(),
   ]);
 
   const routes = shuttleData.routes.map((route) => {
@@ -128,5 +176,10 @@ export async function getAdminNetworkData(): Promise<AdminNetworkData> {
       maskOpacity: mapConfig.maskOpacity,
     },
     bounds: getPolygonBounds(polygon),
+    hardwareMappings,
+    pendingHardware: pendingHardware.sort(
+      (left, right) =>
+        new Date(right.lastPolledAt).getTime() - new Date(left.lastPolledAt).getTime(),
+    ),
   };
 }

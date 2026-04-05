@@ -102,7 +102,7 @@ self.addEventListener("notificationclick", (event) => {
 
   event.waitUntil(
     (async () => {
-      const windowClients = await clients.matchAll({
+      const windowClients = await self.clients.matchAll({
         type: "window",
         includeUncontrolled: true,
       });
@@ -113,8 +113,8 @@ self.addEventListener("notificationclick", (event) => {
         }
       }
 
-      if (clients.openWindow) {
-        return clients.openWindow("/");
+      if (self.clients.openWindow) {
+        return self.clients.openWindow("/");
       }
 
       return undefined;

@@ -6,6 +6,8 @@ import { normalizeLiveVehicleFeed } from "@/lib/vehicles/status";
 export const CHANNEL_VEHICLES = "vehicles:update";
 const VEHICLE_SNAPSHOT_KEY = "vehicles:snapshot";
 const REDIS_READY_TIMEOUT_MS = 1_500;
+const REDIS_DISABLED_FOR_TESTS =
+  process.env.NODE_ENV === "test" || process.env.VITEST === "true";
 
 // ── Connection options ───────────────────────────────────────────────────────
 const REDIS_URL = process.env.REDIS_URL ?? "redis://localhost:6379";
@@ -81,6 +83,10 @@ function isRedisReady(client: Redis): boolean {
 }
 
 async function ensureRedisReady(client: Redis): Promise<boolean> {
+  if (REDIS_DISABLED_FOR_TESTS) {
+    return false;
+  }
+
   if (isRedisReady(client)) {
     return true;
   }
@@ -129,6 +135,57 @@ async function ensureRedisReady(client: Redis): Promise<boolean> {
     client.on("error", onError);
     client.on("end", onEnd);
   });
+}
+
+export async function readRedisHash(
+  key: string,
+): Promise<Record<string, string> | null> {
+  const isReady = await ensureRedisReady(redisPublisher);
+  if (!isReady) {
+    return null;
+  }
+
+  try {
+    const values = await redisPublisher.hgetall(key);
+    return Object.keys(values).length > 0 ? values : {};
+  } catch {
+    return null;
+  }
+}
+
+export async function writeRedisHashValue(
+  key: string,
+  field: string,
+  value: string,
+): Promise<boolean> {
+  const isReady = await ensureRedisReady(redisPublisher);
+  if (!isReady) {
+    return false;
+  }
+
+  try {
+    await redisPublisher.hset(key, field, value);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export async function deleteRedisHashValue(
+  key: string,
+  field: string,
+): Promise<boolean> {
+  const isReady = await ensureRedisReady(redisPublisher);
+  if (!isReady) {
+    return false;
+  }
+
+  try {
+    await redisPublisher.hdel(key, field);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 export async function readVehicleSnapshot(): Promise<VehicleFeedSnapshot | null> {

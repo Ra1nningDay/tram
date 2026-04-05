@@ -55,10 +55,6 @@ export type AdminActivityData = {
   recentUserCount: number;
 };
 
-function toKilobytes(_bytes: number) {
-  return Math.max(1, Math.round(_bytes / 1024));
-}
-
 async function getWritableAssets(): Promise<WritableAsset[]> {
   // Data is now stored in the database, not files
   return [

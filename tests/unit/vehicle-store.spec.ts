@@ -5,14 +5,11 @@ import {
   removeVehicle,
   upsertVehicle,
 } from "../../src/lib/vehicles/store";
-
-type VehicleStoreGlobal = typeof globalThis & {
-  __vehicleStore?: unknown;
-};
+import { resetVehicleSourceStateStores } from "../../src/lib/vehicles/source-state";
 
 describe("vehicle store", () => {
   beforeEach(() => {
-    delete (globalThis as VehicleStoreGlobal).__vehicleStore;
+    resetVehicleSourceStateStores();
   });
 
   it("removes a live vehicle immediately", async () => {
@@ -25,9 +22,9 @@ describe("vehicle store", () => {
       source: "driver",
     });
 
-    expect(getAllVehicles()).toHaveLength(1);
-    expect(removeVehicle("TRAM-8")).toBe(true);
-    expect(getAllVehicles()).toHaveLength(0);
+    await expect(getAllVehicles()).resolves.toHaveLength(1);
+    await expect(removeVehicle("TRAM-8")).resolves.toBe(true);
+    await expect(getAllVehicles()).resolves.toHaveLength(0);
   });
 
   it("does not remove a newer vehicle session with a stale stop request", async () => {
@@ -41,9 +38,9 @@ describe("vehicle store", () => {
       sessionId: "session-new",
     });
 
-    expect(removeVehicle("TRAM-8", "session-old")).toBe(false);
-    expect(getAllVehicles()).toHaveLength(1);
-    expect(removeVehicle("TRAM-8", "session-new")).toBe(true);
-    expect(getAllVehicles()).toHaveLength(0);
+    await expect(removeVehicle("TRAM-8", "session-old")).resolves.toBe(false);
+    await expect(getAllVehicles()).resolves.toHaveLength(1);
+    await expect(removeVehicle("TRAM-8", "session-new")).resolves.toBe(true);
+    await expect(getAllVehicles()).resolves.toHaveLength(0);
   });
 });

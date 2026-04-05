@@ -7,10 +7,10 @@ import {
   BALANCED_MOVING_SPEED_THRESHOLD_KPH,
 } from "@/lib/vehicles/balanced-profile";
 import { buildVehicleEtaSnapshot } from "@/lib/vehicles/eta";
-import { getVehicleAgeMs, normalizeLiveVehicleFeed } from "@/lib/vehicles/status";
+import { getVehicleAgeMs } from "@/lib/vehicles/status";
 import {
   getAllVehicleTelemetryStates,
-  getAllVehicles,
+  getCurrentLiveVehicleFeed as getStoreCurrentLiveVehicleFeed,
 } from "@/lib/vehicles/store";
 
 function buildFilteredTelemetryByVehicleId(
@@ -99,7 +99,7 @@ export function buildLiveFeedDiagnostics(
 export async function buildLiveVehicleFeedSnapshot(
   serverTime: Date = new Date(),
 ): Promise<VehicleFeedSnapshot> {
-  const telemetryStates = getAllVehicleTelemetryStates();
+  const telemetryStates = await getAllVehicleTelemetryStates();
   const vehicles = telemetryStates.map((telemetry) => telemetry.snapshot);
   const { telemetryByVehicleId } = await buildVehicleEtaSnapshot(telemetryStates, serverTime);
   const snapshot = {
@@ -140,8 +140,8 @@ export async function getLiveVehicleFeed(): Promise<Vehicle[]> {
   return snapshot.vehicles;
 }
 
-export function getCurrentLiveVehicleFeed(): Vehicle[] {
-  return normalizeLiveVehicleFeed(getAllVehicles());
+export async function getCurrentLiveVehicleFeed(): Promise<Vehicle[]> {
+  return getStoreCurrentLiveVehicleFeed();
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────

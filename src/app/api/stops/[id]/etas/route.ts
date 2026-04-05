@@ -12,7 +12,7 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> },
 ) {
   const { id: stopId } = await params;
-  const telemetryStates = getAllVehicleTelemetryStates();
+  const telemetryStates = await getAllVehicleTelemetryStates();
   const { etasByStopId } = await buildVehicleEtaSnapshot(telemetryStates);
 
   return NextResponse.json({

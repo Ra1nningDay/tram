@@ -19,7 +19,7 @@ type RouteStopContext = {
   alongM: number;
 };
 
-type RouteProjectionContext = {
+export type RouteProjectionContext = {
   coordinates: LngLat[];
   measure: ClosedRouteMeasure;
   stops: RouteStopContext[];
@@ -36,6 +36,15 @@ export type RawVehicleFix = {
 export type TelemetryRouteContext = {
   outbound: RouteProjectionContext | null;
   inbound: RouteProjectionContext | null;
+};
+
+export type TelemetryDirectionCandidate = {
+  direction: VehicleDirection;
+  matchedPosition: Vehicle["matchedPosition"];
+  routeDistanceM?: number;
+  offRouteDistanceM?: number;
+  projected: boolean;
+  headingDeltaDeg?: number;
 };
 
 export type LiveVehicleTelemetryInput = {
@@ -342,6 +351,130 @@ function projectToRoute(
     offRouteDistanceM: roundTo(distanceMeters(rawPoint, projection.point), 1),
     projected: true,
   };
+}
+
+function deriveSegmentHeading(
+  coordinates: LngLat[],
+  segmentIndex: number,
+): number | undefined {
+  const from = coordinates[segmentIndex];
+  const to = coordinates[(segmentIndex + 1) % coordinates.length];
+
+  if (!from || !to) {
+    return undefined;
+  }
+
+  const dx = to[0] - from[0];
+  const dy = to[1] - from[1];
+
+  if (Math.abs(dx) < 1e-12 && Math.abs(dy) < 1e-12) {
+    return undefined;
+  }
+
+  return normalizeHeading((Math.atan2(dx, dy) * 180) / Math.PI);
+}
+
+function getHeadingDeltaDeg(
+  heading: number | undefined,
+  segmentHeading: number | undefined,
+): number | undefined {
+  if (typeof heading !== "number" || typeof segmentHeading !== "number") {
+    return undefined;
+  }
+
+  const delta = Math.abs(heading - segmentHeading);
+  return Math.min(delta, 360 - delta);
+}
+
+export function getTelemetryDirectionCandidates(
+  rawFix: RawVehicleFix,
+  routeContext: TelemetryRouteContext,
+): TelemetryDirectionCandidate[] {
+  const rawPoint: LngLat = [rawFix.longitude, rawFix.latitude];
+
+  return (["outbound", "inbound"] as const)
+    .map((direction) => {
+      const directionContext = routeContext[direction];
+      if (!directionContext) {
+        return {
+          direction,
+          matchedPosition: {
+            lng: rawFix.longitude,
+            lat: rawFix.latitude,
+          },
+          projected: false,
+        } satisfies TelemetryDirectionCandidate;
+      }
+
+      const projection = projectPointToPolyline(directionContext.coordinates, rawPoint);
+      const segmentHeading = deriveSegmentHeading(
+        directionContext.coordinates,
+        projection.segmentIndex,
+      );
+
+      return {
+        direction,
+        matchedPosition: {
+          lng: roundTo(projection.point[0], 6),
+          lat: roundTo(projection.point[1], 6),
+        },
+        routeDistanceM: roundTo(alongM(directionContext.measure, projection), 1),
+        offRouteDistanceM: roundTo(distanceMeters(rawPoint, projection.point), 1),
+        projected: true,
+        headingDeltaDeg: getHeadingDeltaDeg(
+          isSaneDeviceHeading(rawFix.heading) ? normalizeHeading(rawFix.heading) : undefined,
+          segmentHeading,
+        ),
+      } satisfies TelemetryDirectionCandidate;
+    })
+    .sort((left, right) => {
+      const leftDistance = left.offRouteDistanceM ?? Number.POSITIVE_INFINITY;
+      const rightDistance = right.offRouteDistanceM ?? Number.POSITIVE_INFINITY;
+      return leftDistance - rightDistance;
+    });
+}
+
+export function resolveTelemetryDirection(params: {
+  rawFix: RawVehicleFix;
+  routeContext: TelemetryRouteContext;
+  previousDirection?: VehicleDirection;
+}): VehicleDirection {
+  const candidates = getTelemetryDirectionCandidates(params.rawFix, params.routeContext);
+  const [bestCandidate, fallbackCandidate] = candidates;
+
+  if (!bestCandidate) {
+    return params.previousDirection ?? "outbound";
+  }
+
+  if (!fallbackCandidate) {
+    return bestCandidate.direction;
+  }
+
+  const bestDistance = bestCandidate.offRouteDistanceM ?? Number.POSITIVE_INFINITY;
+  const fallbackDistance = fallbackCandidate.offRouteDistanceM ?? Number.POSITIVE_INFINITY;
+
+  if (
+    params.previousDirection &&
+    Math.abs(bestDistance - fallbackDistance) <= 5
+  ) {
+    return params.previousDirection;
+  }
+
+  const bestHeadingDelta = bestCandidate.headingDeltaDeg ?? Number.POSITIVE_INFINITY;
+  const fallbackHeadingDelta =
+    fallbackCandidate.headingDeltaDeg ?? Number.POSITIVE_INFINITY;
+
+  if (Math.abs(bestDistance - fallbackDistance) <= 2) {
+    if (Math.abs(bestHeadingDelta - fallbackHeadingDelta) >= 20) {
+      return bestHeadingDelta <= fallbackHeadingDelta
+        ? bestCandidate.direction
+        : fallbackCandidate.direction;
+    }
+  }
+
+  return bestDistance <= fallbackDistance
+    ? bestCandidate.direction
+    : fallbackCandidate.direction;
 }
 
 function deriveAlongRouteSpeedKph(
